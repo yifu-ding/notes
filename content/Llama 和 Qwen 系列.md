@@ -58,7 +58,7 @@ $$\mathrm{FFN}_{\mathrm{Swish}}(x,W_1,W_2)=\mathrm{Swish}_1(xW_1)W_2$$
 
 其中激活函数 $\mathrm{Swish}(x)=x\cdot\mathrm{Sigmoid}(\beta x)=\frac{x}{1+e^{-\beta x}}$，Sigmoid 函数 $\sigma(x)=\frac{1}{1+e^{-x}}$。$\beta$ 可以是常数或可训练参数。下图展示了不同 $\beta$ 值下的 Swish 曲线。
 
-![[assets/Untitled 27.jpg|600]]
+![[Untitled 27.jpg|600]]
 
 > [!note]
 > 1. 如果 $\beta=1$，Swish 等价于 Sigmoid 加权线性单元 `SiLU`。
@@ -104,7 +104,7 @@ LLaMA-1 在构建其训练数据集时，进行了多种来源的数据预处理
 
 **LLaMA-2** 的 Tokenizer 配置与 **LLaMA-1** 完全相同，分词使用 `SentencePiece` 库实现的 `BPE` 算法，字典大小为 `32k`。**LLaMA-2 模型架构和 LLaMA-1 一模一样，但模型推理的解码阶段的 kv cache 优化上做了改变。**具体来说，在 34B 和 70B 参数模型上使用了 `GQA` 优化技术，7B 和 13B 模型依然使用 `MQA`。
 
-![[assets/Untitled 29.jpg|760]]
+![[Untitled 29.jpg|760]]
 
 ### 4.4.3 LLaMA-3
 
@@ -134,7 +134,7 @@ Llama 4 系列包括 `Llama 4 Scout`、`Llama 4 Maverick` 和 `Llama 4 Behemoth`
 
 除此之外，还有多模态大模型 `Qwen-VL` 和 `Qwen-VL-Chat`。模型总览图如上图。
 
-![[assets/Untitled 30.jpg|380]]
+![[Untitled 30.jpg|380]]
 
 #### 模型结构
 

@@ -16,9 +16,9 @@ configuration:
     fontOrigin: googleFonts
     cdnCaching: true
     typography:
-      header: Schibsted Grotesk
-      body: Source Sans Pro
-      code: IBM Plex Mono
+      header: Inter
+      body: Source Serif 4
+      code: JetBrains Mono
     colors:
       lightMode:
         light: "#faf8f8"
@@ -112,10 +112,17 @@ plugins:
     order: 92
   - source: "@quartz-community/quartz-fonts"
     enabled: true
+    options:
+      useThemeFonts: false
+      fontOrigin: googleFonts
+      title: Inter
+      header: Inter
+      body: Source Serif 4
+      code: JetBrains Mono
   - source: "@quartz-themes/core"
     enabled: true
     options:
-      theme: default
+      theme: minimal
       mode: both
   - source: "@quartz-community/remove-draft"
     enabled: true

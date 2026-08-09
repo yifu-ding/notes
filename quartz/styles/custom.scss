@@ -63,3 +63,8 @@
   font-weight: 400;
   font-size: 0.88rem;
 }
+
+/* 保留 KaTeX 的 TeX 数学字体；仅将文字型大运算符（如 min/max）设为 Times。 */
+.katex .mop.op-symbol:not(.large-op) {
+  font-family: "Times New Roman", Times, serif;
+}

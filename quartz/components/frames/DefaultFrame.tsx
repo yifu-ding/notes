@@ -42,6 +42,31 @@ export const DefaultFrame: PageFrame = {
             </div>
           </div>
           <Content {...componentData} />
+          {componentData.fileData.filePath &&
+            (() => {
+              const rawPath = String(componentData.fileData.filePath).replaceAll("\\", "/")
+
+              // 保证最终路径是 GitHub repo 里的 content/xxx.md
+              const contentIndex = rawPath.lastIndexOf("/content/")
+              const repoPath =
+                contentIndex >= 0
+                  ? rawPath.slice(contentIndex + 1)
+                  : rawPath.startsWith("content/")
+                    ? rawPath
+                    : `content/${rawPath}`
+
+              const encodedPath = repoPath.split("/").map(encodeURIComponent).join("/")
+
+              const editUrl = `https://github.com/yifu-ding/notes/edit/v5/${encodedPath}`
+
+              return (
+                <div class="edit-on-github">
+                  <a href={editUrl} target="_blank" rel="noopener noreferrer">
+                    Edit this page on GitHub
+                  </a>
+                </div>
+              )
+            })()}
           <hr />
           <div class="page-footer">
             {afterBody.map((BodyComponent) => (

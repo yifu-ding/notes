@@ -1,12 +1,3 @@
-**Contents**
-
-1. [[#Byte-Pair Encoding（BPE）|Byte-Pair Encoding（BPE）]]
-	1. [[#Byte-Pair Encoding（BPE）#[Q1] BPE 如何构建词典？|[Q1] BPE 如何构建词典？]]
-2. [[#WordPiece|WordPiece]]
-	1. [[#WordPiece#[Q2] WordPiece 与 BPE 异同点是什么？|[Q2] WordPiece 与 BPE 异同点是什么？]]
-3. [[#SentencePiece|SentencePiece]]
-	1. [[#SentencePiece#[Q3] 简单介绍一下 SentencePiece 思路？|[Q3] 简单介绍一下 SentencePiece 思路？]]
-
 ### Byte-Pair Encoding（BPE）
 
 #### [Q1] BPE 如何构建词典？

@@ -1,3 +1,19 @@
 @use "./variables.scss" as *;
 
 // put your custom CSS here!
+
+.edit-on-github {
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+
+  a {
+    opacity: 0.7;
+    text-decoration: none;
+  }
+
+  a:hover {
+    opacity: 1;
+    text-decoration: underline;
+  }
+}

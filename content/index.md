@@ -2,7 +2,6 @@
 title: AI Infra 八股基础知识
 ---
 
-# AI Infra 八股基础知识
 
 大模型与 AI Infra 面试基础知识整理。
 

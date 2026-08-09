@@ -1,12 +1,3 @@
----
-tags:
-  - 八股
-  - 生成模型
-  - Diffusion
-  - FlowMatching
----
-
-# DDPM 和 Flow-Matching 的训练目标分别是如何构造的
 
 > [!abstract] 一句话总结
 > 两者都可以写成"先构造中间状态，再让网络回归一个监督目标"，区别主要在**监督目标是什么**。

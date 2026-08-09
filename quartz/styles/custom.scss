@@ -17,3 +17,49 @@
     text-decoration: underline;
   }
 }
+
+/* Table of Contents 层级缩进 */
+.toc .toc-content > li.depth-0 {
+  padding-left: 0 !important;
+}
+
+.toc .toc-content > li.depth-1 {
+  padding-left: 0.8rem !important;
+}
+
+.toc .toc-content > li.depth-2 {
+  padding-left: 1.6rem !important;
+}
+
+.toc .toc-content > li.depth-3 {
+  padding-left: 2.4rem !important;
+}
+
+.toc .toc-content > li.depth-4 {
+  padding-left: 3.2rem !important;
+}
+
+.toc .toc-content > li.depth-5 {
+  padding-left: 4rem !important;
+}
+
+/* TOC 一级 */
+.toc .toc-content > li.depth-0 > a {
+  font-weight: 650;
+  font-size: 0.95rem;
+}
+
+/* TOC 二级 */
+.toc .toc-content > li.depth-1 > a {
+  font-weight: 550;
+  font-size: 0.92rem;
+}
+
+/* TOC 三级及以下 */
+.toc .toc-content > li.depth-2 > a,
+.toc .toc-content > li.depth-3 > a,
+.toc .toc-content > li.depth-4 > a,
+.toc .toc-content > li.depth-5 > a {
+  font-weight: 400;
+  font-size: 0.88rem;
+}

@@ -2,7 +2,7 @@
 
 ### 4.4.1 LLaMA-1（2023 年 2 月发布）
 
-**LLaMA（Large Language Model Meta AI）**是由 Meta AI 发布的一个开放且高效的大型基础语言模型，共有 `7B`、`13B`、`33B`、`65B` 四种版本。
+**LLaMA（Large Language Model Meta AI）** 是由 Meta AI 发布的一个开放且高效的大型基础语言模型，共有 `7B`、`13B`、`33B`、`65B` 四种版本。
 
 其数据集来源都是公开数据集，无任何定制数据集，保证了其工作与开源兼容和可复现，整个训练数据集在 token 化之后大约包含 `1.4T` 的 token。其中，**LLaMA-65B 和 LLaMA-33B**是在 1.4 万亿个 token 上训练的，而最小的模型 **LLaMA-7B** 是在 1 万亿个 token 上训练的。具体的模型参数如下表。
 
@@ -30,7 +30,7 @@
 
 #### RMSNorm
 
-**RMSNorm（Root Mean Square Layer Normalization）**假设 LayerNorm 中的重新中心化不再是必须的，即平移不变性不重要，并提出了一种新的归一化方法：**均方根层归一化 RMSNorm。RMSNorm 通过均方根 RMS 对每一层神经元的输入进行归一化，使模型具备重新缩放不变性和隐式学习率调整的能力。**相比 LayerNorm，**RMSNorm 计算更为简洁，大约可以节省 7% 到 64% 的运算。**
+**RMSNorm（Root Mean Square Layer Normalization）** 假设 LayerNorm 中的重新中心化不再是必须的，即平移不变性不重要，并提出了一种新的归一化方法：**均方根层归一化 RMSNorm。RMSNorm 通过均方根 RMS 对每一层神经元的输入进行归一化，使模型具备重新缩放不变性和隐式学习率调整的能力。** 相比 LayerNorm，**RMSNorm 计算更为简洁，大约可以节省 7% 到 64% 的运算。**
 
 **RMSNorm** 对每个 token 的特征向量进行归一化计算。设某个 token 的特征向量为 $x\in\mathbb R$，RMSNorm 的计算如下：
 

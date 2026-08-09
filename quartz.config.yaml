@@ -79,6 +79,8 @@ plugins:
     order: 40
   - source: "@quartz-community/table-of-contents"
     enabled: true
+    options:
+      maxDepth: 4
     order: 50
     layout:
       position: right
@@ -113,7 +115,7 @@ plugins:
   - source: "@quartz-themes/core"
     enabled: true
     options:
-      theme: default
+      theme: flexoki-warm
       mode: both
   - source: "@quartz-community/remove-draft"
     enabled: true

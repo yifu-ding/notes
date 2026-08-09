@@ -16,3 +16,6 @@ node ./quartz/bootstrap-cli.mjs build
 # 3. Commit, pull remote changes, and push the v5 branch. Extra Quartz sync
 #    flags can be forwarded, e.g. ./scripts/compile.sh --no-pull on first push.
 node ./quartz/bootstrap-cli.mjs sync "$@"
+
+
+echo "run npx quartz build --serve"

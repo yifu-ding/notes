@@ -115,7 +115,7 @@ plugins:
   - source: "@quartz-themes/core"
     enabled: true
     options:
-      theme: flexoki-warm
+      theme: default
       mode: both
   - source: "@quartz-community/remove-draft"
     enabled: true

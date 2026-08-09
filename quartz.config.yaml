@@ -17,7 +17,7 @@ configuration:
     cdnCaching: true
     typography:
       header: Inter
-      body: Source Serif 4
+      body: Inter
       code: JetBrains Mono
     colors:
       lightMode:
@@ -117,7 +117,7 @@ plugins:
       fontOrigin: googleFonts
       title: Inter
       header: Inter
-      body: Source Serif 4
+      body: Inter
       code: JetBrains Mono
   - source: "@quartz-themes/core"
     enabled: true

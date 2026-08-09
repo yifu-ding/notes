@@ -2,6 +2,22 @@
 
 // put your custom CSS here!
 
+/* Inter for Latin text; Noto Sans SC and the system UI supply Chinese glyphs. */
+:root {
+  --bodyFont: Inter, "Noto Sans SC", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --headerFont: Inter, "Noto Sans SC", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --titleFont: Inter, "Noto Sans SC", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--headerFont);
+}
+
 .edit-on-github {
   margin-top: 2rem;
   margin-bottom: 1rem;

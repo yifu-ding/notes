@@ -19,8 +19,9 @@ h6 {
 }
 
 .edit-on-github {
-  margin-top: 2rem;
-  margin-bottom: 1rem;
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 0.75rem;
   font-size: 0.9rem;
 
   a {
@@ -83,4 +84,69 @@ h6 {
 /* 保留 KaTeX 的 TeX 数学字体；仅将文字型大运算符（如 min/max）设为 Times。 */
 .katex .mop.op-symbol:not(.large-op) {
   font-family: "Times New Roman", Times, serif;
+}
+
+/* =========================================================
+   Force serif math typography independent of Quartz theme
+   ========================================================= */
+
+/* KaTeX 普通数学文字 */
+.katex {
+  font-family: KaTeX_Main, "Times New Roman", Times, "Songti SC", STSong, SimSun, serif !important;
+  font-size: calc(1em - 1px) !important;
+}
+
+/* 数学变量 x, p, q 等 */
+.katex .mathnormal {
+  font-family: KaTeX_Math, "Times New Roman", Times, "Songti SC", STSong, SimSun, serif !important;
+}
+
+/* \mathrm{} */
+.katex .mathrm {
+  font-family: KaTeX_Main, "Times New Roman", Times, "Songti SC", STSong, SimSun, serif !important;
+}
+
+/* min, max, log, sin 等 operator */
+.katex .mop:not(.op-symbol),
+.katex .operatorname {
+  font-family: KaTeX_Main, "Times New Roman", Times, "Songti SC", STSong, SimSun, serif !important;
+}
+
+/* \text{} 等公式内文字 */
+.katex .mord.text {
+  font-family: KaTeX_Main, "Times New Roman", Times, "Songti SC", STSong, SimSun, serif !important;
+}
+
+/* 数字、公式内中英文文本都使用衬线字体。 */
+.katex .mord,
+.katex .mtext,
+.katex .text {
+  font-family: KaTeX_Main, "Times New Roman", Times, "Songti SC", STSong, SimSun, serif !important;
+}
+
+/* 恢复数学变量的 KaTeX Math 字体。 */
+.katex .mord.mathnormal {
+  font-family: KaTeX_Math, "Times New Roman", Times, "Songti SC", STSong, SimSun, serif !important;
+}
+
+/* 括号与定界符：普通括号使用 KaTeX Main，\left/\right 保留对应的可伸缩 KaTeX Size 字体。 */
+.katex .mopen,
+.katex .mclose {
+  font-family: KaTeX_Main, "Times New Roman", Times, "Songti SC", STSong, SimSun, serif !important;
+}
+
+.katex .delimsizing.size1 {
+  font-family: KaTeX_Size1, KaTeX_Main, "Times New Roman", Times, serif !important;
+}
+
+.katex .delimsizing.size2 {
+  font-family: KaTeX_Size2, KaTeX_Main, "Times New Roman", Times, serif !important;
+}
+
+.katex .delimsizing.size3 {
+  font-family: KaTeX_Size3, KaTeX_Main, "Times New Roman", Times, serif !important;
+}
+
+.katex .delimsizing.size4 {
+  font-family: KaTeX_Size4, KaTeX_Main, "Times New Roman", Times, serif !important;
 }

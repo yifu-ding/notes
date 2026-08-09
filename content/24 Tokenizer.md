@@ -1,0 +1,47 @@
+**Contents**
+
+1. [[#Byte-Pair Encoding（BPE）|Byte-Pair Encoding（BPE）]]
+	1. [[#Byte-Pair Encoding（BPE）#[Q1] BPE 如何构建词典？|[Q1] BPE 如何构建词典？]]
+2. [[#WordPiece|WordPiece]]
+	1. [[#WordPiece#[Q2] WordPiece 与 BPE 异同点是什么？|[Q2] WordPiece 与 BPE 异同点是什么？]]
+3. [[#SentencePiece|SentencePiece]]
+	1. [[#SentencePiece#[Q3] 简单介绍一下 SentencePiece 思路？|[Q3] 简单介绍一下 SentencePiece 思路？]]
+
+### Byte-Pair Encoding（BPE）
+
+#### [Q1] BPE 如何构建词典？
+
+BPE（Byte-Pair Encoding）通过反复合并语料中出现频率最高的相邻字节对来逐步构建词表，整体流程分四步：
+
+1. **准备语料与目标词表大小**：准备足够的训练语料，并预先设定期望构建的词表大小（合并停止的上限）；
+2. **拆分为字符粒度并统计词频**：把每个单词拆分为字符粒度（字粒度），并在单词末尾添加结束符后缀 `</w>`，统计语料中每个单词的出现频率；
+3. **统计并合并最高频字节对**：统计当前词表中每一个连续/相邻字节对的出现频率，将出现频率最高的相邻字节对合并为一个新的子词，加入词表；
+4. **重复合并直到停止条件**：重复第 3 步，持续合并下一个最高频字节对，直到词表大小达到设定值，或者下一个最高频字节对的出现频率已降为 1（即语料中已不存在有意义的高频可合并对）为止。
+
+> [!note] 采用 BPE 的代表模型
+> GPT-2、BART 和 LLaMA 均采用了 BPE 分词算法。
+
+---
+
+### WordPiece
+
+#### [Q2] WordPiece 与 BPE 异同点是什么？
+
+WordPiece 本质上仍然是 BPE 的思想——都是从字符粒度出发，不断合并相邻子词来构建词表；两者最大的区别在于**如何选择两个子词进行合并**：
+
+- **BPE**：选择语料中**出现频次最大**的相邻子词对进行合并；
+- **WordPiece**：选择**能够最大程度提升语言模型似然概率**的相邻子词对进行合并，即不是单纯看共现频率，而是看合并后对语言模型整体概率提升最大的那一对子词，将其加入词表。
+
+> [!note] 采用 WordPiece 的代表模型
+> BERT 采用了 WordPiece 分词算法。
+
+---
+
+### SentencePiece
+
+#### [Q3] 简单介绍一下 SentencePiece 思路？
+
+SentencePiece 的核心思路是**把空格也当作一种普通字符来处理**（通常用特殊符号 `▁` 显式表示空格），不再依赖语言自带的空格分词作为预处理前提，再在此基础上用 BPE 或 Unigram 等子词算法构造词汇表。这样可以直接对原始文本（包括没有显式空格分隔的语言，如中文、日文）统一建模，且分词结果可逆，能够无损还原回原始文本。
+
+> [!note] 采用 SentencePiece 的代表模型
+> ChatGLM、BLOOM、PaLM 均采用了 SentencePiece 分词算法。

@@ -242,9 +242,18 @@ $$
 
 - **第一阶段（推理对齐）**：仅训练一个专门用于代码和数学的奖励模型 $RM_{reasoning}$，并用其反馈优化策略模型 $\pi_\theta$： $r_i = RM_{reasoning}(o_i)$。
 - **第二阶段（人类偏好对齐）**：采用多奖励框架，融合有用性奖励模型 $RM_{helpful}$、安全性奖励模型 $RM_{safety}$ 与基于规则的奖励模型 $RM_{rule}$。最终响应的奖励通过组合这些来源来确定：
-  $$
-r_i = C_1 \cdot RM_{helpful}(o_i) + C_2 \cdot RM_{safety}(o_i) + C_3 \cdot RM_{rule}(o_i)
+  
 $$
+r_i
+=
+C_1 \cdot RM_{\mathrm{helpful}}(o_i)
++
+C_2 \cdot RM_{\mathrm{safety}}(o_i)
++
+C_3 \cdot RM_{\mathrm{rule}}(o_i)
+$$
+
+
   其中 $C_1$、$C_2$、$C_3$ 是相应系数。
 
 为了获得在强化学习训练中起关键作用的可靠奖励模型，DeepSeek 仔细收集偏好数据，并精心进行质量过滤和比例调整。这里基于编译器反馈获取代码偏好数据，并基于真实标签获取数学偏好数据。对于奖励模型的训练，使用DeepSeek-V2 Chat （SFT）初始化奖励模型，并使用point-wise 或pair-wise 损失进行训练。*强化学习训练能够充分挖掘和激活模型的潜力，使其能够在可能的响应中选择正确且满意的答案。*

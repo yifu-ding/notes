@@ -45,7 +45,7 @@ title: AI Infra 八股基础知识
 
 ## Coding
 
-- [[实习面试准备/八股基础知识/chapters/coding/CUDA C++ Coding|CUDA C++ Coding]]
-- [[实习面试准备/八股基础知识/chapters/coding/CUDA 概念|CUDA 概念]]
-- [[实习面试准备/八股基础知识/chapters/coding/Python Coding|Python Coding]]
-- [[实习面试准备/八股基础知识/chapters/coding/Triton Coding|Triton Coding]]
+- [[CUDA C++ Coding]]
+- [[CUDA 概念]]
+- [[Python Coding]]
+- [[Triton Coding]]

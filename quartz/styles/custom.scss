@@ -151,6 +151,23 @@ h6 {
   font-family: KaTeX_Size4, KaTeX_Main, "Times New Roman", Times, serif !important;
 }
 
+/* 居中块级公式，同时保留过宽公式的横向滚动。 */
+.katex-display {
+  display: block !important;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.katex-display > .katex {
+  display: inline-block;
+}
+
+/* 居中 Markdown 表格；窄屏时仍由容器负责横向滚动。 */
+.table-container > table {
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* 桌面端缩窄左右侧栏，扩大正文 */
 @media (min-width: 1200px) {
   .page[data-frame="default"] > #quartz-body {

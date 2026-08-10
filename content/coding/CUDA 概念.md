@@ -147,7 +147,7 @@ grid 大小向上取整后，最后一个 block 可能有多余的 thread，inde
 
 #### [Q7] x/y/z 是什么？影响硬件调度吗？
 
-x/y/z 是软件坐标系，**硬件只认线性 ID**。GPU 执行时会把 dim3 坐标展平：
+x/y/z 是软件坐标系，**硬件只认线性 ID** 。GPU 执行时会把 dim3 坐标展平：
 
 ```
 线性 thread ID = threadIdx.x
@@ -215,7 +215,9 @@ A[1][0], A[1][1], A[1][2], ...   ← 第1行连续
 
 利用转置恒等式绕开，**不需要真的转置数据**：
 
-$$C = A \times B \iff C^\top = B^\top \times A^\top$$
+$$
+C = A \times B \iff C^\top = B^\top \times A^\top
+$$
 
 row-major 存储的矩阵 $A$，在 cuBLAS（column-major 视角）里看到的正好是 $A^\top$。因此把参数顺序对调，cuBLAS 就能算出正确的 row-major 结果：
 
@@ -383,7 +385,7 @@ PyTorch 底层调 cuBLAS 时会自动处理 strides，非 contiguous tensor 通�
 
 **[Q15] shared memory**
 
-1️⃣ **shared memory 数组**两种定义方式：
+1️⃣ **shared memory 数组** 两种定义方式：
 
 ```cpp
 // 静态：编译时确定大小，写死在代码里
@@ -416,7 +418,7 @@ int*   sB = (int*)(smem_raw + block * sizeof(float));
 
 ###### [概念] Warp Divergence：分支导致的串行化
 
-**定义**：同一 Warp 内的 32 个 thread 执行同一条指令（SIMT），若遇到 `if/else`，硬件会**两个分支都执行**，不走某分支的 thread 被 mask 掉（不写结果）。这叫 Warp Divergence，会将并行变为串行。
+**定义**：同一 Warp 内的 32 个 thread 执行同一条指令（SIMT），若遇到 `if/else`，硬件会** 两个分支都执行**，不走某分支的 thread 被 mask 掉（不写结果）。这叫 Warp Divergence，会将并行变为串行。
 
 ```cpp
 // ❌ 典型 divergence：warp 内奇偶 thread 走不同分支
@@ -578,7 +580,7 @@ cudaEventDestroy(start); cudaEventDestroy(stop);
 
 ###### [概念] Atomics：atomicAdd / atomicMax 使用场景
 
-**原子操作**保证同一内存地址的 read-modify-write 不被其他 thread 中断，但会**串行化竞争**。
+**原子操作** 保证同一内存地址的 read-modify-write 不被其他 thread 中断，但会**串行化竞争** 。
 
 ```cpp
 // atomicAdd：多个 thread 同时写同一地址时的正确求和

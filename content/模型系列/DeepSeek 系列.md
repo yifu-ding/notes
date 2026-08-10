@@ -169,7 +169,7 @@ DeepSeek-V2 在一个包含 `8.1T token` 的高质量多源语料库上进行了
 
 对于 DeepSeek-V2 的模型结构来说，主要有多头潜在注意力 MLA 和 DeepSeekMoE 两个方面，如右图所示，这在本书“模型架构”章节的“注意力改进”及“FFN 改进”部分有详细的介绍，这里不再赘述。
 
-- **MHA 中 KV cache 会成为推理瓶颈**。MQA 和 GQA 可以在一定程度上减少 KV cache，但效果上不如 MHA。DeepSeek-V2 设计了 **MLA**，通过低秩 key-value 联合压缩，实现了比 MHA 更好的效果且需要的 KV cache 要小很多。
+- **MHA 中 KV cache 会成为推理瓶颈** 。MQA 和 GQA 可以在一定程度上减少 KV cache，但效果上不如 MHA。DeepSeek-V2 设计了 **MLA**，通过低秩 key-value 联合压缩，实现了比 MHA 更好的效果且需要的 KV cache 要小很多。
 - **DeepSeek-V2 的 Transformer Block × L** 由输入层、RMS Norm、Attention、RMS Norm、Feed-Forward Network（DeepSeekMoE）叠加组成，输出即为本轮变换的隐层。DeepSeekMoE 中将 FFN 拆分为一个可见的所有共享的 shared expert 1 以及 N_S 个路由中的 Routed Expert（编码时为 $[1, N_S], [N_r]_{i=1}^{N_r}$ 的表现形式，带 Router 和 Top-K 选择）。
 
 

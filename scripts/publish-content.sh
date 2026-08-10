@@ -21,4 +21,19 @@ fi
 mkdir -p "${target_dir}"
 rsync -a --delete --exclude='.DS_Store' "${source_dir}/" "${target_dir}/"
 
+# Quartz's Markdown parser can leave `**bold**中文` unparsed. Preserve the
+# Obsidian source while making the published copy unambiguous.
+while IFS= read -r -d '' markdown_file; do
+  perl -CSDA -i -pe 's/(\*\*[^*\n]+\*\*)(?=\p{Han})/$1 /g' "${markdown_file}"
+done < <(find "${target_dir}" -type f -name '*.md' -print0)
+
+# Keep one-line display math in coding notes semantically unambiguous. This
+# only changes lines that contain a complete $$...$$ expression and no prose.
+coding_dir="${target_dir}/coding"
+if [[ -d "${coding_dir}" ]]; then
+  while IFS= read -r -d '' markdown_file; do
+    perl -CSDA -i -pe 's/^([ \t]*)\$\$(.+)\$\$[ \t]*$/$1\$\$\n$2\n$1\$\$/' "${markdown_file}"
+  done < <(find "${coding_dir}" -type f -name '*.md' -print0)
+fi
+
 printf 'Synced Obsidian content to %s\n' "${target_dir}"

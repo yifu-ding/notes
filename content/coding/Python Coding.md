@@ -13,11 +13,15 @@ date: 2026-06-23
 
 *原理* Softmax 将一组数值转换为概率分布，每个元素的概率正比于其指数值除以所有元素指数值之和：
 
-$$\text{softmax}(x_i) = \frac{e^{x_i}}{\sum_j e^{x_j}}$$
+$$
+\text{softmax}(x_i) = \frac{e^{x_i}}{\sum_j e^{x_j}}
+$$
 
 *数值稳定性* 直接计算 $e^{x_i}$ 在 $x_i$ 很大时会溢出。常见技巧：减去最大值 $\max(x)$ 再取指数，结果不变但避免溢出：
 
-$$\text{softmax}(x_i) = \frac{e^{x_i - \max(x)}}{\sum_j e^{x_j - \max(x)}}$$
+$$
+\text{softmax}(x_i) = \frac{e^{x_i - \max(x)}}{\sum_j e^{x_j - \max(x)}}
+$$
 
 *Solution*
 
@@ -82,11 +86,15 @@ def single_neuron_model(features, labels, weights, bias):
 
 *原理* Log-softmax 是 softmax 取对数，数值上更稳定：
 
-$$\log\text{softmax}(x_i) = x_i - \log\sum_j e^{x_j}$$
+$$
+\log\text{softmax}(x_i) = x_i - \log\sum_j e^{x_j}
+$$
 
 减去 $\max(x)$ 后等价形式（防溢出）：
 
-$$= (x_i - \max x) - \log\sum_j e^{x_j - \max x}$$
+$$
+= (x_i - \max x) - \log\sum_j e^{x_j - \max x}
+$$
 
 *Solution 1（直接法，更稳定）*
 
@@ -124,7 +132,9 @@ def log_softmax(scores: list) -> np.ndarray:
 
 *原理*
 
-$$\text{ReLU}(x) = \max(0, x)$$
+$$
+\text{ReLU}(x) = \max(0, x)
+$$
 
 *Solution*
 
@@ -143,7 +153,9 @@ def relu(x: float) -> float:
 
 *原理*
 
-$$\text{LeakyReLU}(x) = \begin{cases} x & x > 0 \\ \alpha x & x \leq 0 \end{cases}$$
+$$
+\text{LeakyReLU}(x) = \begin{cases} x & x > 0 \\ \alpha x & x \leq 0 \end{cases}
+$$
 
 相比 ReLU，负值区域保留一个小斜率 $\alpha$，缓解 **神经元死亡（dying ReLU）** 问题。
 
@@ -164,7 +176,9 @@ def leaky_relu(z: float, alpha: float = 0.01) -> float:
 
 *原理* KL 散度衡量分布 $P$ 相对于参考分布 $Q$ 的差异，对两个正态分布有解析公式：
 
-$$\text{KL}(P \| Q) = \log\frac{\sigma_q}{\sigma_p} + \frac{\sigma_p^2 + (\mu_p - \mu_q)^2}{2\sigma_q^2} - \frac{1}{2}$$
+$$
+\text{KL}(P \| Q) = \log\frac{\sigma_q}{\sigma_p} + \frac{\sigma_p^2 + (\mu_p - \mu_q)^2}{2\sigma_q^2} - \frac{1}{2}
+$$
 
 ==知道 KL 散度公式就行==
 
@@ -343,11 +357,15 @@ def forward(
 
 *原理* 激活值存在 per-channel outlier，难以直接量化；权重分布更平滑。SmoothQuant 将量化难度从激活迁移到权重：
 
-$$XW = \underbrace{(X / s)}_{\text{smooth activation}} \cdot \underbrace{(W \cdot s)^T}_{\text{absorb into weight}}$$
+$$
+XW = \underbrace{(X / s)}_{\text{smooth activation}} \cdot \underbrace{(W \cdot s)^T}_{\text{absorb into weight}}
+$$
 
 其中 per-input-channel 平滑尺度：
 
-$$s_i = \frac{\max|x_i|^\alpha}{\max|w_i|^{1-\alpha}}$$
+$$
+s_i = \frac{\max|x_i|^\alpha}{\max|w_i|^{1-\alpha}}
+$$
 
 - $\alpha \to 1$：更多难度迁移到权重；$\alpha \to 0$：保持激活原始分布
 - 量化方案：激活用 **per-token**（每行一个 scale），权重用 **per-output-channel**（每行一个 scale）

@@ -86,7 +86,7 @@ threadIdx.x =  64..95  → Warp 2，lane 0..31
 threadIdx.x = 96..127  → Warp 3，lane 0..31
 ```
 
-Lane 是 Warp 内的相对编号，不同 Warp 的 lane 互相独立。`__shfl` 系列指令只能在**同一 Warp 的 lane 之间**通信，不能跨 Warp。
+Lane 是 Warp 内的相对编号，不同 Warp 的 lane 互相独立。`__shfl` 系列指令只能在**同一 Warp 的 lane 之间** 通信，不能跨 Warp。
 
 ---
 
@@ -213,7 +213,9 @@ nsys profile --output report ./out      # → 生成 report.nsys-rep
 
 *原理* Elementwise 是最简单的 GPU 并行模式：每个 thread 处理一个元素，完全并行无依赖。核心是正确计算全局 index：`i = blockIdx.x * blockDim.x + threadIdx.x`，并做越界保护。
 
-$$\text{ReLU}(x) = \max(0, x), \qquad \frac{\partial L}{\partial x} = \begin{cases} \frac{\partial L}{\partial y} & x > 0 \\ 0 & x \leq 0 \end{cases}$$
+$$
+\text{ReLU}(x) = \max(0, x), \qquad \frac{\partial L}{\partial x} = \begin{cases} \frac{\partial L}{\partial y} & x > 0 \\ 0 & x \leq 0 \end{cases}
+$$
 
 *Solution*
 
@@ -599,7 +601,7 @@ __global__ void gemm_naive(const float* A, const float* B, float* C,
 > ```
 > 同一 Warp（同一行，x 连续）访问 `C[row][col]`，col 是 x 方向，地址连续 → **coalesced access** ✅
 >
-> 反过来，若用 `threadIdx.y` 作列方向，同一 Warp 访问跨行地址 → 不连续 → **性能暴跌**。
+> 反过来，若用 `threadIdx.y` 作列方向，同一 Warp 访问跨行地址 → 不连续 → **性能暴跌** 。
 
 
 [[main 函数验证的完整 code block#带 main 函数的 gemm_naive|完整代码（含 main）→]]
@@ -610,7 +612,7 @@ __global__ void gemm_naive(const float* A, const float* B, float* C,
 
 *Question* 在 naive GEMM 基础上，用 shared memory 做分块。每次把 $A$ 和 $B$ 当前 tile（大小 $\text{TS} \times \text{TS}$）搬入 `__shared__`，让 block 内所有 thread 复用同一份数据，减少 global memory 读取次数。
 
-*原理* 沿 $K$ 维分 $\lceil K/\text{TS} \rceil$ 个 tile，每次迭代：① block 内所有 thread **协作**加载 A 的列 tile 和 B 的行 tile 到 shared memory；② 同步；③ 在 shared memory 内做 tile 内点积累加；④ 同步后进入下一 tile。
+*原理* 沿 $K$ 维分 $\lceil K/\text{TS} \rceil$ 个 tile，每次迭代：① block 内所有 thread **协作** 加载 A 的列 tile 和 B 的行 tile 到 shared memory；② 同步；③ 在 shared memory 内做 tile 内点积累加；④ 同步后进入下一 tile。
 
 Global memory 访问从每次迭代 $O(K)$ 降到 $O(K/\text{TS})$ 次，理论加速比为 TS。
 
@@ -652,7 +654,7 @@ __global__ void gemm_tiled(const float* A, const float* B, float* C,
 > - **计算后**：防止下一轮迭代覆盖 sA/sB 时，某些 thread 还在读当前 tile。两个缺一不可。
 
 > [!warning] sA 的 Bank Conflict
-> `sA[threadIdx.y][k]`：同一 warp 内 32 个 thread（threadIdx.y 不同，k 固定）访问同一列 → 32 个 thread 落在同一 bank → **32-way bank conflict**。
+> `sA[threadIdx.y][k]`：同一 warp 内 32 个 thread（threadIdx.y 不同，k 固定）访问同一列 → 32 个 thread 落在同一 bank → **32-way bank conflict** 。
 > 解决方法：Padding，将 `float sA[TS][TS+1]`，每行多一个 padding float，使各行起始地址错开，消除 conflict。
 
 ---
@@ -905,7 +907,7 @@ __global__ void flash_attention_forward_warp(const float* Q,
 
 - 相同点：都用 online softmax 维护 $m, \ell, O$，不显式存 $T \times T$ attention matrix。
 - 简化点：这里是一个 warp 处理一个 query，且 `d <= 32`；真实实现会用 Q/K/V tile、shared memory、多个 warp/CTA 协作、向量化加载、处理更大的 head dim。
-- 面试重点：公式和 IO 思路比手写工业级 kernel 更重要，即 **计算量仍是 $O(T^2d)$，但 HBM 读写从 materialize attention matrix 的 $O(T^2)$ 降下来**。
+- 面试重点：公式和 IO 思路比手写工业级 kernel 更重要，即 **计算量仍是 $O(T^2d)$，但 HBM 读写从 materialize attention matrix 的 $O(T^2)$ 降下来** 。
 
 ---
 
@@ -1020,7 +1022,7 @@ __global__ void transpose(const float* A, float* B, int M, int N) {
 > [!warning] 为什么需要 padding `[TS][TS+1]`？
 >
 > **Shared memory bank 基础**
-> Shared memory 被切成 32 个 bank，每个 bank 宽 4 字节（1 个 float）。一个 float 的 bank 编号 = `(该 float 的 shared mem 偏移量 / 4) % 32`。同一 warp 的 32 个 thread **同时**访问 shared mem，如果多个 thread 落在同一 bank → 串行化 → bank conflict。
+> Shared memory 被切成 32 个 bank，每个 bank 宽 4 字节（1 个 float）。一个 float 的 bank 编号 = `(该 float 的 shared mem 偏移量 / 4) % 32`。同一 warp 的 32 个 thread **同时** 访问 shared mem，如果多个 thread 落在同一 bank → 串行化 → bank conflict。
 >
 > **写入时（无 conflict）**
 > 写 `tile[threadIdx.y][threadIdx.x]`，同一 warp：threadIdx.y 相同，threadIdx.x = 0..31。
@@ -1029,7 +1031,7 @@ __global__ void transpose(const float* A, float* B, int M, int N) {
 >
 > **读出时（有 conflict）**
 > 读 `tile[threadIdx.x][threadIdx.y]`，同一 warp：threadIdx.y 相同（设为 `c`），threadIdx.x = 0..31。
-> 访问的是同一**列**的 32 个 float：`tile[0][c], tile[1][c], ..., tile[31][c]`
+> 访问的是同一**列** 的 32 个 float：`tile[0][c], tile[1][c], ..., tile[31][c]`
 > 在 row-major 布局下，`tile[row][col]` 的偏移 = `row * TS + col`
 > 所以这 32 次访问的偏移为 `0*TS+c, 1*TS+c, ..., 31*TS+c`
 > Bank 编号 = `(row * TS + c) % 32`，当 TS = 32 时：
@@ -1051,7 +1053,9 @@ __global__ void transpose(const float* A, float* B, int M, int N) {
 
 *原理*
 
-$$\text{score}_j = \frac{Q[b,i,:] \cdot K[b,j,:]}{\sqrt{d}}, \quad \alpha = \text{softmax}(\text{score}), \quad \text{out}[b,i,:] = \sum_j \alpha_j V[b,j,:]$$
+$$
+\text{score}_j = \frac{Q[b,i,:] \cdot K[b,j,:]}{\sqrt{d}}, \quad \alpha = \text{softmax}(\text{score}), \quad \text{out}[b,i,:] = \sum_j \alpha_j V[b,j,:]
+$$
 
 *Solution*
 

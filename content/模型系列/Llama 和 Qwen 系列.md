@@ -34,9 +34,13 @@
 
 **RMSNorm** 对每个 token 的特征向量进行归一化计算。设某个 token 的特征向量为 $x\in\mathbb R$，RMSNorm 的计算如下：
 
-$$\mathrm{RMSNorm}(x):\hat{x}_i=\gamma\odot\frac{x_i}{\mathrm{RMS}(x)}$$
+$$
+\mathrm{RMSNorm}(x):\hat{x}_i=\gamma\odot\frac{x_i}{\mathrm{RMS}(x)}
+$$
 
-$$\mathrm{RMS}(x)=\sqrt{\frac{1}{d}\sum_{x_i\in x}x_i^2+\epsilon}$$
+$$
+\mathrm{RMS}(x)=\sqrt{\frac{1}{d}\sum_{x_i\in x}x_i^2+\epsilon}
+$$
 
 其中，$\gamma$ 是可学习的缩放参数，$\epsilon$ 的作用是为了保持数值稳定性。$d$ 为输入 token 的数量。
 
@@ -44,17 +48,25 @@ $$\mathrm{RMS}(x)=\sqrt{\frac{1}{d}\sum_{x_i\in x}x_i^2+\epsilon}$$
 
 FFN 计算过程用数学公式可表达为：
 
-$$\mathrm{FFN}(x,W_1,W_2,b_1,b_2)=\max(0,xW_1+b_1)W_2+b_2$$
+$$
+\mathrm{FFN}(x,W_1,W_2,b_1,b_2)=\max(0,xW_1+b_1)W_2+b_2
+$$
 
 在 T5 中，使用的是没有偏置的版本，数学公式表达为：
 
-$$\mathrm{FFN}(x,W_1,W_2)=\max(0,xW_1)W_2$$
+$$
+\mathrm{FFN}(x,W_1,W_2)=\max(0,xW_1)W_2
+$$
 
 后续的研究提出了用其他非线性激活函数替换 ReLU，如高斯误差线性单元 **GELU（Gaussian Error Linear Units）**：$\mathrm{GELU}(x)=x\Phi(x)$ 和自门控激活函数 $\mathrm{Swish}_\beta(x)=x\sigma(\beta x)$，其中 $\sigma$ 为 Sigmoid 激活函数：
 
-$$\mathrm{FFN}_{\mathrm{GELU}}(x,W_1,W_2)=\mathrm{GELU}(xW_1)W_2$$
+$$
+\mathrm{FFN}_{\mathrm{GELU}}(x,W_1,W_2)=\mathrm{GELU}(xW_1)W_2
+$$
 
-$$\mathrm{FFN}_{\mathrm{Swish}}(x,W_1,W_2)=\mathrm{Swish}_1(xW_1)W_2$$
+$$
+\mathrm{FFN}_{\mathrm{Swish}}(x,W_1,W_2)=\mathrm{Swish}_1(xW_1)W_2
+$$
 
 其中激活函数 $\mathrm{Swish}(x)=x\cdot\mathrm{Sigmoid}(\beta x)=\frac{x}{1+e^{-\beta x}}$，Sigmoid 函数 $\sigma(x)=\frac{1}{1+e^{-x}}$。$\beta$ 可以是常数或可训练参数。下图展示了不同 $\beta$ 值下的 Swish 曲线。
 
@@ -265,15 +277,21 @@ Transformer 架构的模型在注意力机制的上下文长度方面有很大�
 
 一般来说，内插方法可以写成如下表达式：
 
-$$f'(x_m,m,\theta)=f(x_m,g(m),h(\theta))$$
+$$
+f'(x_m,m,\theta)=f(x_m,g(m),h(\theta))
+$$
 
 其中第 $i$ 个维度有 $\theta_i=b^{-\frac{2(i-1)}{d}}, b=10000, i=1,2,\ldots,\frac d2$，这里从位置和旋转角度两个方面对所有内插方案进行了总结，即所有内插方案都是建立在对二者的变换上的。此时可以将位置插值 PI 改写为：
 
-$$f_{PI}(x_m,m,\theta)=f(x_m,g(m)=\frac mS,h(\theta_i)=\theta_i)$$
+$$
+f_{PI}(x_m,m,\theta)=f(x_m,g(m)=\frac mS,h(\theta_i)=\theta_i)
+$$
 
 即 ==PI 中没有对旋转角度做任何改变，只是将位置索引除以扩展比。==基于上式，NTK-aware 的做法可以被表述为：
 
-$$f_{NTK}(x_m,m,\theta)=f(x_m,g(m)=m,h(\theta_i)=(b\cdot S^{\frac d{d-2}})^{-\frac{2(i-1)}d})$$
+$$
+f_{NTK}(x_m,m,\theta)=f(x_m,g(m)=m,h(\theta_i)=(b\cdot S^{\frac d{d-2}})^{-\frac{2(i-1)}d})
+$$
 
 即 **NTK-aware 插值本质上就是将原始 RoPE 中的** $\theta_i=b^{-\frac{2(i-1)}d}$ **改为** $h(\theta_i)=(b\cdot S^{\frac d{d-2}})^{-\frac{2(i-1)}d}$，更本质的区别是将基数 base 乘以了一个和扩展比 $S$ 有关的常量 $S^{\frac d{d-2}}$，与位置插值 PI 相比，这种方法在扩展非微调模型的上下文大小方面表现得更好。然而这种方法的一个主要缺点是，==它不仅仅是一种插值方案，一些维度会被轻微外推到超出边界的值，因此使用 NTK-aware 插值进行微调的结果不如 PI；此外，由于存在越界值，理论尺度因子 $S$ 并不能准确描述真实的上下文扩展尺度。==在实践中，对于给定的上下文长度扩展，尺度值 $S$ 必须设置得高于预期尺度。
 
@@ -291,7 +309,9 @@ $$f_{NTK}(x_m,m,\theta)=f(x_m,g(m)=m,h(\theta_i)=(b\cdot S^{\frac d{d-2}})^{-\fr
 
 根据熵不变性以及一些合理的假设，可以得到一个新的缩放因子，从而得到一种 **Scaled Dot-Product Attention**：
 
-$$\operatorname{Attention}(Q,K,V)=\operatorname{softmax}(\frac{k\log n}{d}QK^T)V$$
+$$
+\operatorname{Attention}(Q,K,V)=\operatorname{softmax}(\frac{k\log n}{d}QK^T)V
+$$
 
 这里的 $k$ 是一个跟 $n,d$ 都无关的超参数。LogN-Scaling 可以根据上下文长度与训练长度的比值，对 $Q$ 和 $V$ 的点积进行重新缩放，确保注意力值的熵随着上下文长度的增长而保持稳定。
 
@@ -420,25 +440,35 @@ PPO 阶段共包含四个模型：`policy模型`、`value模型`、`reference模
 
 **例**：假设有一个长度为 12 的输入序列：
 
-$$\mathrm{Input}=[x_1,x_2,x_3,x_4,x_5,x_6,x_7,x_8,x_9,x_{10},x_{11},x_{12}]$$
+$$
+\mathrm{Input}=[x_1,x_2,x_3,x_4,x_5,x_6,x_7,x_8,x_9,x_{10},x_{11},x_{12}]
+$$
 
 将这个序列分成 3 个块，每个块包含 4 个元素：
 
-$$\mathrm{Chunk}_1=[x_1,x_2,x_3,x_4],\ \mathrm{Chunk}_2=[x_5,x_6,x_7,x_8],\ \mathrm{Chunk}_3=[x_9,x_{10},x_{11},x_{12}]$$
+$$
+\mathrm{Chunk}_1=[x_1,x_2,x_3,x_4],\ \mathrm{Chunk}_2=[x_5,x_6,x_7,x_8],\ \mathrm{Chunk}_3=[x_9,x_{10},x_{11},x_{12}]
+$$
 
 **局部注意力**：在每个块内计算注意力。对于第一个块：
 
-$$\operatorname{Attention}(x_i,x_j)=\frac{\exp(x_i\cdot x_j)}{\sum_{k=1}^{4}\exp(x_i\cdot x_k)}$$
+$$
+\operatorname{Attention}(x_i,x_j)=\frac{\exp(x_i\cdot x_j)}{\sum_{k=1}^{4}\exp(x_i\cdot x_k)}
+$$
 
 这里 `·` 表示点积操作。然后对每个块进行类似的操作，得到每个块内的注意力表示。
 
 **全局注意力**：对于每个块，计算一个全局表示。假设使用平均值作为块的表示：
 
-$$R_1=\frac14\sum_{i=1}^{4}x_i,\ R_2=\frac14\sum_{i=5}^{8}x_i,\ R_3=\frac14\sum_{i=9}^{12}x_i$$
+$$
+R_1=\frac14\sum_{i=1}^{4}x_i,\ R_2=\frac14\sum_{i=5}^{8}x_i,\ R_3=\frac14\sum_{i=9}^{12}x_i
+$$
 
 然后在这些块表示之间计算全局注意力：
 
-$$\operatorname{GlobalAttention}(C_i,C_j)=\frac{\exp(C_i\cdot C_j)}{\sum_{k=1}^{3}\exp(C_i\cdot C_k)}$$
+$$
+\operatorname{GlobalAttention}(C_i,C_j)=\frac{\exp(C_i\cdot C_j)}{\sum_{k=1}^{3}\exp(C_i\cdot C_k)}
+$$
 
 这里 $C_i$ 表示第 $i$ 个块的表示。
 

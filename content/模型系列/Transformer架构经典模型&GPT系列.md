@@ -281,13 +281,21 @@ GPT 和 BERT 本质都基于 Transformer，均先在无标签数据上学习预�
 
 给定无监督 token 语料 $\mathcal U=\{u_1,\ldots,u_n\}$，最大化：
 
-$$L_1(\mathcal U)=\sum_i\log P(u_i\mid u_{i-k},\ldots,u_{i-1};\Theta)$$
+$$
+L_1(\mathcal U)=\sum_i\log P(u_i\mid u_{i-k},\ldots,u_{i-1};\Theta)
+$$
 
 其中 $k$ 是上下文窗口大小，条件概率 $P$ 由参数 $\Theta$ 的神经网络建模。GPT-1 使用多层 Transformer 解码器，即 Multi-Head Self-Attention，之后增加前馈网络层。
 
-$$h_0=UW_e+W_p$$
-$$h_l=\mathrm{Transformer\_block}(h_{l-1}),\ \forall l\in[1,n]$$
-$$P(u)=\mathrm{Softmax}(h_nW_e^T)$$
+$$
+h_0=UW_e+W_p
+$$
+$$
+h_l=\mathrm{Transformer\_block}(h_{l-1}),\ \forall l\in[1,n]
+$$
+$$
+P(u)=\mathrm{Softmax}(h_nW_e^T)
+$$
 
 其中 $U=(u_{-k},\ldots,u_{-1})$ 是 token 上下文向量，$n$ 是层数，$W_e$ 是 token 嵌入矩阵，$W_p$ 是位置嵌入矩阵。训练使用 12 层 Transformer、768 维词编码、12 个注意力头，Adam 优化器，最大学习率 $2.5\mathrm e{-4}$，批量大小 64，epoch 为 100；使用 BPE、dropout 0.1、GELU 和可学习位置编码。
 
@@ -295,12 +303,18 @@ $$P(u)=\mathrm{Softmax}(h_nW_e^T)$$
 
 对于有标签训练集 $\mathcal C$，给定输入序列 $x^1,\ldots,x^m$ 和标签 $y$：
 
-$$P(y\mid x^1,\ldots,x^m)=\mathrm{softmax}(h_l^mW_y)$$
-$$L_2(\mathcal C)=\sum_{(x,y)}\log P(y\mid x^1,\ldots,x^m)$$
+$$
+P(y\mid x^1,\ldots,x^m)=\mathrm{softmax}(h_l^mW_y)
+$$
+$$
+L_2(\mathcal C)=\sum_{(x,y)}\log P(y\mid x^1,\ldots,x^m)
+$$
 
 GPT-1 发现将语言模型作为辅助对象参与微调可提升监督模型的泛化性能并加速收敛，使用：
 
-$$L_3(\mathcal C)=L_2(\mathcal C)+\lambda L_1(\mathcal C)$$
+$$
+L_3(\mathcal C)=L_2(\mathcal C)+\lambda L_1(\mathcal C)
+$$
 
 > [!note]
 > 1. **分类**：文本最后一个词的向量作为微调输入，得到分类结果。

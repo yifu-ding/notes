@@ -86,7 +86,7 @@ DeepSeek 首先在计算预算为 1e17 的小规模实验上进行了 batch 大�
 
 然后，利用多步学习率调度器，通过重用第一阶段，有效规避了不同 batch 大小、学习率和计算预算从 `1e17` 到 `2e19` 的多个模型。考虑到参数空间中的冗余，将泛化误差不超过最小值 0.25% 的模型参数视为近最优超参数。然后拟合 batch 大小 $B$ 和学习率 $\eta$ 与计算预算 $C$ 之间的关系，拟合结果表明，*最优 batch 大小 $B$ 随着计算预算 $C$ 的增加而逐渐增加，而最优学习率 $\eta$ 则随着计算预算 $C$ 的增加而逐渐减小*。拟合的最终学习率和 batch 大小公式如下：
 
-![[Pasted image 20260810104806.png]]
+![[Pasted image 20260810104806.png|600]]
 
 然后在具有`1e20`计算预算的一系列模型上验证了上述公式，在2.94B FLOPs/token 模型大小上实验的结果上图（b）所示，*这表明拟合的参数集中在最优参数空间中，并且 DeepSeek LLM 7B 和 67B 模型拟合的参数同样取得了良好的性能。*
 
@@ -109,7 +109,7 @@ M
 \end{aligned}
 $$
 
-![[Pasted image 20260810105007.png|400]]
+![[Pasted image 20260810105007.png|600]]
 
 > 注：其中 $N_{layer}$ 表示层数，$d_{model}$ 表示模型宽度，$n_{vocab}$ 是词汇大小，$l_{seq}$ 是序列长度。
 
@@ -131,7 +131,7 @@ $$
 
 其中，$M_{base} = 0.1715$，$a = 0.5243$，$D_{base} = 5.8316$，$b = 0.4757$。
 
-![[Pasted image 20260810105042.png]]
+![[Pasted image 20260810105042.png|600]]
 
 ##### 不同数据的缩放定律
 
@@ -173,7 +173,7 @@ DeepSeek-V2 在一个包含 `8.1T token` 的高质量多源语料库上进行了
 - **DeepSeek-V2 的 Transformer Block × L** 由输入层、RMS Norm、Attention、RMS Norm、Feed-Forward Network（DeepSeekMoE）叠加组成，输出即为本轮变换的隐层。DeepSeekMoE 中将 FFN 拆分为一个可见的所有共享的 shared expert 1 以及 N_S 个路由中的 Routed Expert（编码时为 $[1, N_S], [N_r]_{i=1}^{N_r}$ 的表现形式，带 Router 和 Top-K 选择）。
 
 
-![[Pasted image 20260810105245.png]]
+![[Pasted image 20260810105245.png|600]]
 
 > [!NOTE] DeepSeekMoE 引入了两个主要策略：
 > 
@@ -225,7 +225,7 @@ DeepSeek 整理了指令调优数据集，包含 1.5M 个实例，其模型的�
 
 为了节省 RL 的训练成本，DeepSeek-V2 采用了组相对策略优化 GRPO（Group Relative Policy Optimization），这种方法不依赖 Sam手与策略模型相同规模的评论家模型，而是通过组评分来估计基线。具体来说，对于每个问题 $q$，GRPO 从策略 $\pi_{old}$ 中采样一组输出 $\{o_1, o_2, \dots, o_G\}$，然后通过最大化以下目标函数来优化策略模型 $\pi_\theta$：
 
-![[Pasted image 20260810105354.png]] 
+![[Pasted image 20260810105354.png|600]] 
 
 
 其中 $\epsilon$ 和 $\beta$ 是超参数；$A_i$ 是优势值，使用每个组内输出对应的奖励组 $\{r_1, r_2, \dots, r_G\}$ 进行计算：
@@ -328,7 +328,7 @@ $$
 
 DeepSeek-V3 探索并设置了多 Token 预测目标，将预测范围扩展到每个位置的多个未来 token。这种方法具有双重优势：一方面，MTP 目标能够使训练信号更加密集，有望提升数据使用效率；另一方面，MTP 使模型能够预先规划其表示，从而更好地预测未来 token。
 
-![[Pasted image 20260810105604.png|]]
+![[Pasted image 20260810105604.png|600]]
 
 **MTP 模块**：MTP 采用顺序预测额外 token 的方式，并在每个预测深度保持完整的因果链。具体而言，MTP 使用 $D$ 个顺序模块来预测 $D$ 个额外的 token。第 $k$ 个 MTP 模块由以下组件构成：一个与主模型共享的嵌入层 $Emb(\cdot)$、一个共享的输出头 $OutHead(\cdot)$、一个 Transformer 块 $TRM_k(\cdot)$ 以及一个投影矩阵 $M_k$。在第 $k$ 个预测深度处理第 $i$ 个输入 token 时，首先将两个表示结合起来：第 $k-1$ 深度的第 $i$ 个 token 表示 $h_i^{k-1}$ 和第 $i+k$ 个 token 的嵌入表示 $Emb(t_{i+k})$。这种结合通过如下线性投影实现：
 
@@ -368,11 +368,11 @@ DeepSeek-V3 的训练由 HAI-LLM 框架支持，这是 DeepSeek 的工程师从�
 
 1. **设计了 DualPipe 算法以实现高效的流水线并行**
 
-![[Pasted image 20260810105628.png]]
+![[Pasted image 20260810105628.png|600]]
 
 DeepSeek-V3 的跨节点专家并行因通信开销导致计算与通信效率比率低至 1:1。为此提出了名为 DualPipe 的流水线并行算法，通过重叠前向和后向计算-通信阶段来提升训练效率，并减少流水线中的气泡。DualPipe 创新性地在每个微批次中划分出注意力机制、all-to-all 分发、MLP 和 all-to-all 组合等部分，其中后向批量又细分为输入和权重的反向传播，通过重新排列这些组件并手动调整分配给计算与通信的 GPU SM 比例，实现了 all-to-all 和 PP 通信的有效隐藏。采用双向流水线调度策略，从两端馈送微批次，以完全重叠大部分通信，确保随模型规模扩大仍能保持恒定的计算与通信比率，实现接近零的 all-to-all 通信开销（调度中包含 8 个 PP 等级和 20 个微批次、分为两个方向）。
 
-![[Pasted image 20260810105641.png]]
+![[Pasted image 20260810105641.png|600]]
 
    即使在通信负担较轻的场景下，DualPipe 相较于 ZB1P 和 1F1B 等方法也展示了显著的效率优势，大幅减少了流水线气泡，同时仅轻微增加了峰值激活内存。
 

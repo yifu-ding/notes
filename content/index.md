@@ -43,3 +43,9 @@ title: AI Infra 八股基础知识
 - [[DeepSeek 系列]]
 - [[近期大厂旗舰模型核心技术]]
 
+## Coding
+
+- [[实习面试准备/八股基础知识/chapters/coding/CUDA C++ Coding|CUDA C++ Coding]]
+- [[实习面试准备/八股基础知识/chapters/coding/CUDA 概念|CUDA 概念]]
+- [[实习面试准备/八股基础知识/chapters/coding/Python Coding|Python Coding]]
+- [[实习面试准备/八股基础知识/chapters/coding/Triton Coding|Triton Coding]]

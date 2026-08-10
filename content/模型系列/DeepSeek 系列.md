@@ -109,7 +109,7 @@ M
 \end{aligned}
 $$
 
-![[Pasted image 20260810105007.png]]
+![[Pasted image 20260810105007.png|400]]
 
 > 注：其中 $N_{layer}$ 表示层数，$d_{model}$ 表示模型宽度，$n_{vocab}$ 是词汇大小，$l_{seq}$ 是序列长度。
 
@@ -117,13 +117,17 @@ $$
 
 在采用 $M$ 表示模型规模后，目标可以更清晰地描述为：给定计算预算 $C=MD$，找到最优模型规模 $M_{opt}$ 和数据规模 $D_{opt}$，以最小化模型的泛化误差。这个目标可以形式化为：
 
-$$\{M_{opt}(C),\, D_{opt}(C)\} = \arg\min_{\{M,D\,:\,C=MD\}} L(N, D)$$
+$$
+\{M_{opt}(C),\, D_{opt}(C)\} = \arg\min_{\{M,D\,:\,C=MD\}} L(N, D)
+$$
 
 为了降低实验成本和拟合难度，DeepSeek 采用 IsoFLOP profile 方法来拟合缩放曲线，并选择了 8 个不同的计算预算，范围从 1e17 到 3e20，并为每个预算设计了大约 10 种不同的模型/数据规模分配。每个预算的超参数 $B$ 和 $\eta$ 由之前的讨论确定，泛化误差在对类似分布、包含 100M 个 token 的独立验证集上计算。
 
 最优非嵌入 FLOPs/token $M_{opt}$ 和最优令牌数 $D_{opt}$ 的具体公式如下：
 
-$$M_{opt} = M_{base} \cdot C^{a}, \qquad D_{opt} = D_{base} \cdot C^{b}$$
+$$
+M_{opt} = M_{base} \cdot C^{a}, \qquad D_{opt} = D_{base} \cdot C^{b}
+$$
 
 其中，$M_{base} = 0.1715$，$a = 0.5243$，$D_{base} = 5.8316$，$b = 0.4757$。
 
@@ -226,7 +230,9 @@ DeepSeek 整理了指令调优数据集，包含 1.5M 个实例，其模型的�
 
 其中 $\epsilon$ 和 $\beta$ 是超参数；$A_i$ 是优势值，使用每个组内输出对应的奖励组 $\{r_1, r_2, \dots, r_G\}$ 进行计算：
 
-$$A_i = \frac{r_i - \operatorname{mean}(\{r_1, r_2, \dots, r_G\})}{\operatorname{std}(\{r_1, r_2, \dots, r_G\})}$$
+$$
+A_i = \frac{r_i - \operatorname{mean}(\{r_1, r_2, \dots, r_G\})}{\operatorname{std}(\{r_1, r_2, \dots, r_G\})}
+$$
 
 **GRPO 与 PPO 的区别**：PPO 会额外训练一个与策略模型相同规模的评论家（Value）模型，并通过 GAE 计算优势；GRPO 则放弃评论家模型，直接从一组输出的相对奖励估计优势，省去了大量训练成本。
 
@@ -236,7 +242,9 @@ $$A_i = \frac{r_i - \operatorname{mean}(\{r_1, r_2, \dots, r_G\})}{\operatorname
 
 - **第一阶段（推理对齐）**：仅训练一个专门用于代码和数学的奖励模型 $RM_{reasoning}$，并用其反馈优化策略模型 $\pi_\theta$： $r_i = RM_{reasoning}(o_i)$。
 - **第二阶段（人类偏好对齐）**：采用多奖励框架，融合有用性奖励模型 $RM_{helpful}$、安全性奖励模型 $RM_{safety}$ 与基于规则的奖励模型 $RM_{rule}$。最终响应的奖励通过组合这些来源来确定：
-  $$r_i = C_1 \cdot RM_{helpful}(o_i) + C_2 \cdot RM_{safety}(o_i) + C_3 \cdot RM_{rule}(o_i)$$
+  $$
+r_i = C_1 \cdot RM_{helpful}(o_i) + C_2 \cdot RM_{safety}(o_i) + C_3 \cdot RM_{rule}(o_i)
+$$
   其中 $C_1$、$C_2$、$C_3$ 是相应系数。
 
 为了获得在强化学习训练中起关键作用的可靠奖励模型，DeepSeek 仔细收集偏好数据，并精心进行质量过滤和比例调整。这里基于编译器反馈获取代码偏好数据，并基于真实标签获取数学偏好数据。对于奖励模型的训练，使用DeepSeek-V2 Chat （SFT）初始化奖励模型，并使用point-wise 或pair-wise 损失进行训练。*强化学习训练能够充分挖掘和激活模型的潜力，使其能够在可能的响应中选择正确且满意的答案。*
@@ -282,23 +290,33 @@ DeepSeek-V3 采用 MLA 实现高效推理，并用 DeepSeekMoE 实现经济的�
 
 - **MoE 基础架构**：对于前馈网络 FFN，DeepSeek-V3 采用了 DeepSeekMoE 架构。与传统 MoE 架构相比，DeepSeekMoE 使用更细粒度的专家并将部分专家隔离为共享专家。设 $u_t$ 表示第 $t$ 个 token 的 FFN 输入，按如下方式计算 FFN 的输出 $h_t$：
 
-$$h_t = w_t + \sum_{i=1}^{N_s} FFN_i^{(s)}(u_t) + \sum_{i=1}^{N_r} g_{i,t}\cdot FFN_i^{(r)}(u_t)$$
+$$
+h_t = w_t + \sum_{i=1}^{N_s} FFN_i^{(s)}(u_t) + \sum_{i=1}^{N_r} g_{i,t}\cdot FFN_i^{(r)}(u_t)
+$$
 
-$$g_{i,t} = \begin{cases} \dfrac{s_{i,t}}{\sum_{j \in \text{Topk}(\{s_{j,t}\,|\,1\le j\le N_r\},\, K_r)} s_{j,t}}, & s_{i,t} \in \text{Topk}(\{s_{j,t}\,|\,1\le j\le N_r\},\, K_r) \\[8pt] 0, & \text{otherwise} \end{cases}$$
+$$
+g_{i,t} = \begin{cases} \dfrac{s_{i,t}}{\sum_{j \in \text{Topk}(\{s_{j,t}\,|\,1\le j\le N_r\},\, K_r)} s_{j,t}}, & s_{i,t} \in \text{Topk}(\{s_{j,t}\,|\,1\le j\le N_r\},\, K_r) \\[8pt] 0, & \text{otherwise} \end{cases}
+$$
 
-$$s_{i,t} = \operatorname{Sigmoid}(u_t^T e_i)$$
+$$
+s_{i,t} = \operatorname{Sigmoid}(u_t^T e_i)
+$$
 
 其中 $N_s$ 和 $N_r$ 分别表示共享专家和路由专家的数量，$FFN_i^{(s)}(\cdot)$ 和 $FFN_i^{(r)}(\cdot)$ 分别表示第 $i$ 个共享专家和第 $i$ 个路由专家，$K_r$ 表示激活的路由专家数量，$g_{i,t}$ 是第 $i$ 个专家的门控值，$s_{i,t}$ 是 token 到专家的亲和度，$e_i$ 是第 $i$ 个路由专家的质心向量，$\text{Topk}(\cdot, K)$ 表示在所有路由专家中为第 $t$ 个 token 计算的亲和度分数中最高的 $K$ 个分数的集合。与 DeepSeek-V2 不同的是，DeepSeek-V3 使用 Sigmoid 函数计算亲和度分数，并对所有选定的亲和度分数进行归一化以生成门控值。
 
 - **无辅助损失的负载均衡策略**：对于 MoE 模型来说，专家负载不平衡会导致路由崩溃并降低专家并行下的计算效率。传统解决方案通常依靠辅助损失来避免负载不平衡。然而，过大的辅助损失会损害模型性能。为了在负载均衡和模型性能之间取得更好的平衡，DeepSeek-V3 提出了一种无辅助损失的负载均衡策略。具体来说，为每个专家引入一个偏置项 $b_i$，并将其添加到相应的亲和度分数 $s_{i,t}$ 中，以确定 TopK 路由：
 
-$$g_{i,t} = \begin{cases} s_{i,t}, & s_{i,t} + b_i \in \text{Topk}(\{s_{j,t} + b_j : 1 \le j \le N_r\}, K_r) \\[4pt] 0, & \text{otherwise} \end{cases}$$
+$$
+g_{i,t} = \begin{cases} s_{i,t}, & s_{i,t} + b_i \in \text{Topk}(\{s_{j,t} + b_j : 1 \le j \le N_r\}, K_r) \\[4pt] 0, & \text{otherwise} \end{cases}
+$$
 
 这里偏置项仅用于路由，与 FFN 输出相乘的门控值仍然由原始亲和度分数 $s_{i,t}$ 得出。在训练过程中持续监控每个训练步骤中整个批次的专家负载。在每个步骤结束时，如果相应的专家负载过重，则偏置项减少；如果相应的专家负载不足，则增加；其中 $\gamma$ 是一个称为偏置更新速度的超参数。通过这种动态调整，DeepSeek-V3 在训练过程中保持专家负载均衡，并实现了比纯粹依靠辅助损失的方式更好的性能。
 
 - **互补序列级辅助损失策略**：尽管 DeepSeek-V3 主要依靠无辅助损失策略来实现负载均衡，但为了防止任何单个序列内出现极端不平衡，还采用了互补的序列级平衡损失：
 
-$$\mathcal{L}_{bal} = \alpha \, P \sum_{i=1}^{N_r} f_i\, P_i, \qquad f_i = \frac{1}{T}\sum_{t=1}^{T} \mathbb{1}\left(s_{i,t} \in \text{Topk}(\{s_{j,t}\,:\,1\le j\le N_r\},\, K_r)\right),\qquad P_i = \frac{\sum_{t=1}^{T}s_{i,t}}{\sum_{i=1}^{N_r} \sum_{t=1}^{T} s_{i,t}}$$
+$$
+\mathcal{L}_{bal} = \alpha \, P \sum_{i=1}^{N_r} f_i\, P_i, \qquad f_i = \frac{1}{T}\sum_{t=1}^{T} \mathbb{1}\left(s_{i,t} \in \text{Topk}(\{s_{j,t}\,:\,1\le j\le N_r\},\, K_r)\right),\qquad P_i = \frac{\sum_{t=1}^{T}s_{i,t}}{\sum_{i=1}^{N_r} \sum_{t=1}^{T} s_{i,t}}
+$$
 
 其中 $\alpha$ 是一个平衡因子，被赋予一个极小的值，$\mathbb{1}(\cdot)$ 表示指示函数，$T$ 表示序列中的 token 数量。序列级平衡损失的目的是确保每个序列上的专家负载保持平衡。
 
@@ -310,25 +328,33 @@ $$\mathcal{L}_{bal} = \alpha \, P \sum_{i=1}^{N_r} f_i\, P_i, \qquad f_i = \frac
 
 DeepSeek-V3 探索并设置了多 Token 预测目标，将预测范围扩展到每个位置的多个未来 token。这种方法具有双重优势：一方面，MTP 目标能够使训练信号更加密集，有望提升数据使用效率；另一方面，MTP 使模型能够预先规划其表示，从而更好地预测未来 token。
 
-![[Pasted image 20260810105604.png]]
+![[Pasted image 20260810105604.png|]]
 
 **MTP 模块**：MTP 采用顺序预测额外 token 的方式，并在每个预测深度保持完整的因果链。具体而言，MTP 使用 $D$ 个顺序模块来预测 $D$ 个额外的 token。第 $k$ 个 MTP 模块由以下组件构成：一个与主模型共享的嵌入层 $Emb(\cdot)$、一个共享的输出头 $OutHead(\cdot)$、一个 Transformer 块 $TRM_k(\cdot)$ 以及一个投影矩阵 $M_k$。在第 $k$ 个预测深度处理第 $i$ 个输入 token 时，首先将两个表示结合起来：第 $k-1$ 深度的第 $i$ 个 token 表示 $h_i^{k-1}$ 和第 $i+k$ 个 token 的嵌入表示 $Emb(t_{i+k})$。这种结合通过如下线性投影实现：
 
-$$h_i^{k} = M_k\, [\operatorname{RMSNorm}(h_i^{k-1});\; \operatorname{RMSNorm}(Emb(t_{i+k}))]$$
+$$
+h_i^{k} = M_k\, [\operatorname{RMSNorm}(h_i^{k-1});\; \operatorname{RMSNorm}(Emb(t_{i+k}))]
+$$
 
 其中 $[\cdot]$ 表示向量连接操作。当 $k=1$ 时，$h_i^{k-1}$ 是主模型输出的表示。每个 MTP 模块的嵌入层都与主模型共享。将组合得到的 $h_i^{k}$ 输入到第 $k$ 深度的 Transformer 块中，从而生成当前深度的输出表示。最后，系统将 $h_i^{k}$ 输入到共享输出头中，计算第 $k$ 个额外预测 token 的概率分布 $P_{i+1+k}$（$V$ 为词汇表大小）：
 
-$$P_{i+1+k} = \operatorname{OutHead}(h_i^{k})$$
+$$
+P_{i+1+k} = \operatorname{OutHead}(h_i^{k})
+$$
 
 输出头 $\operatorname{OutHead}(\cdot)$ 首先将表示向量线性映射为 logits，随后通过 Softmax 计算第 $k$ 个额外 token 的预测概率，这里每个 MTP 模块的输出头也与主模型共享。
 
 **MTP 训练目标**：在每个预测深度，计算如下交叉熵损失 $\mathcal{L}_{MTP}$：
 
-$$\mathcal{L}_{MTP}^{(k)} = -\frac{1}{T}\sum_{t=1}^{T} \log P_{t+k}^{(k)}(t_{t+k} \mid t_1,\dots,t_{t+k})$$
+$$
+\mathcal{L}_{MTP}^{(k)} = -\frac{1}{T}\sum_{t=1}^{T} \log P_{t+k}^{(k)}(t_{t+k} \mid t_1,\dots,t_{t+k})
+$$
 
 最终通过计算所有深度 MTP 损失的平均值，并与权重因子 $\lambda$ 相乘，得到总体 MTP 损失 $\mathcal{L}_{MTP}$，作为 DeepSeek-V3 的补充训练目标：
 
-$$\mathcal{L}_{MTP} = \frac{\lambda}{D} \sum_{k=1}^{D} \mathcal{L}_{MTP}^{(k)}$$
+$$
+\mathcal{L}_{MTP} = \frac{\lambda}{D} \sum_{k=1}^{D} \mathcal{L}_{MTP}^{(k)}
+$$
 
 **MTP 的推理**：设计 MTP 策略的主要目的是提升主模型的性能，因此在实际推理阶段可以直接移除 MTP 模块，让主模型独立运行。同时还可以将这些 MTP 模块重新用于推测解码，从而进一步降低生成延迟。
 
@@ -377,14 +403,14 @@ DeepSeek-V3 的跨节点专家并行因通信开销导致计算与通信效率�
 
 此外，为了降低 MoE 训练中的内存和通信开销，激活值以 FP8 格式缓存和分派，而优化器状态则以 BF16 格式存储。该混合精度框架在与 DeepSeek-V2-Lite 和 DeepSeek-V2 相似规模的模型上进行了验证，训练了大约 1T 个 token。结果显示，相比 BF16 基线，FP8 训练模型的相对损失误差保持在 0.25% 以下，在训练随机性的可接受范围内。
 
-![[Pasted image 20260810105755.png]]
+![[Pasted image 20260810105755.png|600]]
 
 - **混合精度框架**：在此框架中，大多数计算密集型操作在 FP8 精度下执行，而少数关键操作则保留其原始数据格式，以平衡训练效率和数值稳定性。大部分核心计算内核以 FP8 精度实现，这些操作接收 FP8 张量作为输入，并产生 BF16 或 FP32 格式的输出。具体来说，与线性算子相关的三个 GEMM 操作——前向传播 Fprop、激活反向传播 Dgrad 和权重反向传播 Wgrad——都在 FP8 精度下执行。这种设计使计算速度理论上比原始 BF16 方法提高一倍。此外，FP8 Wgrad GEMM 允许激活值以 FP8 格式存储，从而显著减少内存消耗。
 - 尽管 FP8 具有效率优势，但某些算子由于对低精度计算的敏感性，仍需要更高的精度支持。因此，以下组件保持原始精度（BF16 或 FP32）：嵌入模块、输出头、MoE 门控模块、归一化算子和注意力算子。为进一步保证数值稳定性，主权重、权重梯度和优化器状态均以更高精度存储。
 
 - **量化和乘法带来的精度提升**：基于混合精度 FP8 框架，DeepSeek 提出了几种策略以提高低精度训练的准确性，重点在量化方法和乘法过程：
  - **细粒度量化**：在低精度训练中，由于 FP8 格式动态范围有限，溢出和下溢是常见挑战。标准做法是将输入张量的最大绝对值缩放到 FP8 的最大可表示值，但这会对激活异常值敏感，降低量化精度。为此引入更细粒度的量化方法：激活值按 1×128 tile 分组（每个 token 128 个通道），权重按 128×128 块分组（128 个输入通道和 128 个输出通道）。这种细化缩放策略确保量化能更好地适应异常值。此外，在 GEMM 操作的内部维度引入每组缩放因子，结合高精度 FP32 累积策略，提升了计算效率。
-![[Pasted image 20260810105809.png]]
+![[Pasted image 20260810105809.png|600]]
  - **提高累加精度**：低精度 GEMM 操作常遇到下溢问题，依赖于高精度累加。然而，在 H800 上 FP8 GEMM 的累加精度限制在约 14 位，低于 FP32。为此采用了提升到 CUDA Cores 进行更高精度累加的策略：Tensor Cores 执行 MMA 时中间结果用有限位宽累加，达到间隔 K 后，把部分结果复制到 CUDA Cores 上的 FP32 寄存器中进行全精度累加。在 CUDA Cores 上相乘的缩放因子实现反量化，同时保持高利用率。
  - **尾数优于指数**：不同于先前工作混合使用 FP8（Fprop 用 E4M3，Dgrad 和 Wgrad 用 E5M2），所有张量均采用 E4M3 格式以获得更高精度。细粒度量化策略使得在较小元素组间共享指数位，减轻了有限动态范围的影响。
  - **在线量化**：针对每个 128×128 的激活图块或权重块在线计算最大绝对值，并推导出缩放因子。基于此最大值，在线将激活或权重量化为 FP8 格式，避免了延迟量化技术带来的复杂性。
@@ -411,7 +437,7 @@ DeepSeek-V3 的跨节点专家并行因通信开销导致计算与通信效率�
 - **优化预训练语料库**：与 DeepSeek-V2 相比，DeepSeek-V3 通过增加数学和编程样本的比例优化了预训练语料库，并将多语言覆盖范围扩展至英语和中文之外。改进的数据处理流程减少了冗余，同时保持了语料库的多样性。采用文档打包方法确保数据完整性，但在训练期间不使用跨样本注意力掩码。DeepSeek-V3 的训练语料库包含 14.8T 高质量和多样化的 token。
 - **中间填充策略（FIM）**：在 DeepSeek-Coder-V2 训练过程中观察到，中间填充（Fill-In-Middle）策略不会无助于下一个 token 的预测能力，反而使模型能够根据上下文线索准确预测中间文本。因此，在 DeepSeek-V3 的预训练中也采用了 FIM 策略。具体实现采用前缀-后缀-中间（PSM）框架：
 
-![[Pasted image 20260810105946.png]]
+![[Pasted image 20260810105946.png|600]]
 
 此结构作为文档级预打包过程的一部分应用，FIM 策略的应用率为 0.1。
 
@@ -453,10 +479,14 @@ DeepSeek 精心制作了指令微调数据集，包含跨多个领域的 1.5M �
 
 与 DeepSeek-V2 类似，采用群组相对策略优化 GRPO，放弃了通常与策略模型大小相同的评论家模型，而是从群组得分中估计基线。具体来说，对于每个问题 q，GRPO 从 I 的策略模型 $\pi_{old}$ 中采样一组输出 $\{o_1, \dots, o_G\}$ 以策略模型 $\pi_\theta$，通过最大化下面的目标来优化：
 
-$$J_{GRPO}(\theta) = E\left[q\sim P(Q),\, \{o_i\}\sim \pi_{old}(\cdot|q)\right] \frac{1}{G}\sum_{i=1}^{G} \Big( \min\Big( \frac{\pi_\theta(o_i|q)}{\pi_{old}(o_i|q)} A_i,\; \operatorname{clip}\Big(\frac{\pi_\theta(o_i|q)}{\pi_{old}(o_i|q)}, 1-\varepsilon, 1+\varepsilon\Big) A_i\Big) - \beta\, D_{KL}\big(\pi_\theta \| \pi_{ref}\big) \Big)$$
+$$
+J_{GRPO}(\theta) = E\left[q\sim P(Q),\, \{o_i\}\sim \pi_{old}(\cdot|q)\right] \frac{1}{G}\sum_{i=1}^{G} \Big( \min\Big( \frac{\pi_\theta(o_i|q)}{\pi_{old}(o_i|q)} A_i,\; \operatorname{clip}\Big(\frac{\pi_\theta(o_i|q)}{\pi_{old}(o_i|q)}, 1-\varepsilon, 1+\varepsilon\Big) A_i\Big) - \beta\, D_{KL}\big(\pi_\theta \| \pi_{ref}\big) \Big)
+$$
 
 其中 $\epsilon$ 和 $\beta$ 是超参数，$\pi_{ref}$ 是参考模型，$A_i$ 是优势，使用组内输出对应的奖励集 $\{r_1, \dots, r_G\}$：
 
-$$A_i = \frac{r_i - \operatorname{mean}(\{r_1, r_2, \dots, r_G\})}{\operatorname{std}(\{r_1, r_2, \dots, r_G\})}$$
+$$
+A_i = \frac{r_i - \operatorname{mean}(\{r_1, r_2, \dots, r_G\})}{\operatorname{std}(\{r_1, r_2, \dots, r_G\})}
+$$
 
 在强化学习过程中，DeepSeek-V3 融入了来自不同领域的提示词，如编码、数学、写作、角色扮演和问答。这不仅让模型更贴近人类偏好，还提高了基准测试上的性能，尤其是在监督微调数据有限的情况下。

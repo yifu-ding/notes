@@ -88,9 +88,18 @@ $$B_{opt} = 0.2920 \cdot C^{0.3271},\qquad \eta \propto C^{-?}$$
 
 为了减小这些误差，DeepSeek 引入了一种新的模型规模表示：非嵌入 FLOPs/token M，它包括了注意力操作的计算开销，但不考虑词汇计算。使用 $M$ 表示模型规模时，计算预算 $C$ 可以简化为 $C=MD$。$6N_1$、$6N_2$ 和 $M$ 之间的具体差异如下：
 
-$$6N_1 = 72\,n_{layer}\,d_{model}^{2}, \qquad
-6N_2 = 72\,n_{layer}\,d_{model}^{2} + 6\,n_{vocab}\,d_{model}, \qquad
-M = 72\,n_{layer}\,d_{model}^{2} + 12\,n_{layer}\,d_{model}\,h_{seq}$$
+$$
+\begin{aligned}
+6N_1
+&= 72\,n_{\mathrm{layer}}\,d_{\mathrm{model}}^2, \\[4pt]
+6N_2
+&= 72\,n_{\mathrm{layer}}\,d_{\mathrm{model}}^2
+ + 6\,n_{\mathrm{vocab}}\,d_{\mathrm{model}}, \\[4pt]
+M
+&= 72\,n_{\mathrm{layer}}\,d_{\mathrm{model}}^2
+ + 12\,n_{\mathrm{layer}}\,d_{\mathrm{model}}\,h_{\mathrm{seq}}.
+\end{aligned}
+$$
 
 | $N_{layer}$ | $d_{model}$ | $n_{vocab}$ | $h_{seq}$ | $N_1$（非嵌入参数） | $N_2$（完整参数） | M |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |

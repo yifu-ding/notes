@@ -150,3 +150,16 @@ h6 {
 .katex .delimsizing.size4 {
   font-family: KaTeX_Size4, KaTeX_Main, "Times New Roman", Times, serif !important;
 }
+
+/* 桌面端缩窄左右侧栏，扩大正文 */
+@media (min-width: 1200px) {
+  .page[data-frame="default"] > #quartz-body {
+    grid-template-columns: 250px minmax(0, 1fr) 250px !important;
+  }
+
+  /* 同时减少侧栏内部左右留白 */
+  .page[data-frame="default"] > #quartz-body > .sidebar {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}

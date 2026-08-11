@@ -228,10 +228,19 @@ plugins:
       priority: 5
       condition: not-index
   - source: "@quartz-community/comments"
-    enabled: false
+    enabled: true
     options:
       provider: giscus
-      options: {}
+      options:
+        repo: "yifu-ding/notes"
+        repoId: "R_kgDOTzSsBQ"
+        category: "Announcements"
+        categoryId: "DIC_kwDOTzSsBc4DDDqQ"
+        mapping: pathname
+        strict: true
+        reactionsEnabled: true
+        inputPosition: top
+        lang: zh-CN
     layout:
       position: afterBody
       priority: 10
@@ -300,10 +309,14 @@ layout:
         - reader-mode
       positions:
         right: []
+        afterBody: []
     tag:
       exclude:
         - reader-mode
       positions:
         right: []
+        afterBody: []
     canvas: {}
-    bases: {}
+    bases:
+      positions:
+        afterBody: []

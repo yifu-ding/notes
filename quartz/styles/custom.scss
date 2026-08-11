@@ -218,6 +218,26 @@ article .markdown-rendered img {
   }
 }
 
+/* Giscus 评论区：与正文同宽，顶部留白；"讨论" 标题层级约等于 h2，跟随主题变量自动适配 Light/Dark。
+   comments 插件本身不渲染标题，用 ::before 补一个，不改动其组件结构。 */
+.giscus {
+  margin-top: 2rem;
+
+  &::before {
+    content: "讨论";
+    display: block;
+    font-family: var(--headerFont);
+    color: var(--dark);
+    font-size: 1.4rem;
+    margin-bottom: 1rem;
+  }
+}
+
+.giscus-frame {
+  width: 100%;
+  border: none;
+}
+
 /* 桌面端缩窄左右侧栏，扩大正文 */
 @media (min-width: 1200px) {
   .page[data-frame="default"] > #quartz-body {

@@ -1,3 +1,19 @@
+## DeepSeek 版本速览
+
+> [!NOTE] 说明
+> V1→V4 是基线模型主干，R1 是独立的推理分支；V3.1 起进入"智能体＋混合推理"时代。以下"发表年月"为官方发布／论文时间
+
+| 版本 | 发表年月 | 参数规模（总/激活） | 新 feature | 局限 |
+| --- | --- | --- | --- | --- |
+| **V1** DeepSeek LLM | 2023.11 | 7B / 67B（Dense） | 首个开源系列，2T token 预训练；Pre-Norm+RMSNorm+SwiGLU+RoPE+GQA；提出非嵌入 FLOPs/token $M$、缩放定律 $C=MD$ 与超参预测 | Dense 推理成本高；中文数据不完善、非中英支持弱；知识滞后、易幻觉 |
+| **V2** | 2024.05 | 236B / 激活21B | **MoE＋MLA**（低秩 KV 联合压缩）；KV cache −93.3%、吞吐 ×5.76、训练成本 −42.5%；细粒度专家＋共享专家；128K 上下文（YaRN） | 非中英语言表现有限；训练后无持续知识更新 |
+| **V2.5** | 2024.09 | 继承 V2（236B/21B） | 合并 Chat 与 Coder，兼得通用对话＋代码；写作/指令跟随更强 | 本质为合并微调，架构独立性弱 |
+| **V3** | 2024.12 | 671B / 激活37B | ** 无辅助损失负载均衡**（动态 bias）；**MTP** 多 Token 预测；DualPipe 流水线；跨节点 all-to-all 内核；FP8 混合精度；仅 2.788M H800 GPU 小时 | 超长离线推理仍偏贵；存在常见 LLM 幻觉与知识滞后 |
+| **R1 / R1-Zero** | 2025.01 | 671B MoE（推理分支） | 纯 RL（GRPO＋可验证规则奖励）从 Base 激发长 CoT；AIME 15.6%→77.9%（多数票 86.7%）；多阶段：冷启动 SFT→推理 RL→拒绝采样 800K→偏好 RL；蒸馏到 Qwen/Llama 小模型 | R1-Zero 可读性差、语言混杂、任务窄；R1 成本高；==文本蒸馏无法 100% 复现推理深度==；官方未披露异步 RL |
+| **V3.1** | 2025.08 | 继承 V3（671B/37B） | 混合推理 **Think/Non-Think 双模**；840B 持续预训练→原生 128K；更新 tokenizer/模板；多步工具调用与 Agent；Terminus 修中英混杂＋乱码 | 整体性能相对冲击有限；极高并发＋超长上下文工具调用时 MoE 动态负载仍可优化 |
+| **V3.2** | 2025.09 | 继承 V3（671B/37B） | **DSA 稀疏注意力**（Lightning Indexer＋细粒度 token 选择）降长上下文成本；专家蒸馏（领域专家→通用）＋混合单阶段 RL（推理/Agent/对齐合一，避免灾难性遗忘） | 稀疏注意力相对稠密存在精度权衡 |
+| **V4** | 2025.10 | Flash 284B/13B；Pro 1.6T/49B | **mHC** 流形约束超连接稳定深层；**CSA+HCA** 混合稀疏注意力，支持 1M 上下文；**Muon** 优化器；预见性路由＋自动回滚治 Loss 尖峰 | MoE 离群值引起训练不稳定（靠回滚/预见性路由兜底）；稀疏注意力有精度退化权衡 |
+
 ## 4.6 DeepSeek 系列
 
 ### 4.6.1 DeepSeek-V1
@@ -8,10 +24,8 @@ DeepSeek 深入研究了规模定律，并提出了自己独特的发现，这�
 
 #### 模型结构
 
-- **微观设计**：大体上遵循了 LLaMA 的设计，采用了带有 RMSNorm 函数的 Pre-Norm 结构，并使用 SwiGLU 作为前馈网络 FFN 的激活函数。使用旋转嵌入 RoPE 用于位置编码。为了优化推理成本，模型使用了分组查询注意力 GQA，而不是传统的多头注意力 MHA。与大多数使用 GQA 的工作不同，DeepSeek LLM 67B 模型的参数扩展在网络深度上，而不是通常做法中拓宽 FFN 层的中间宽度，旨在获得更好的性能。
-- **宏观设计**：DeepSeek LLM 与其他模型不同：
-  - DeepSeek LLM 7B 是 30 层的网络；
-  - DeepSeek LLM 67B 是 95 层的网络。
+- **微观设计**：大体上遵循了 LLaMA 的设计，采用了带有 RMSNorm 函数的 Pre-Norm 结构，并使用 SwiGLU 作为前馈网络 FFN 的激活函数。使用旋转嵌入 RoPE 用于位置编码。为了优化推理成本，模型使用了 *分组查询注意力 GQA*，而不是传统的多头注意力 MHA。与大多数使用 GQA 的工作不同，DeepSeek LLM 67B 模型的参数扩展在网络深度上，而不是通常做法中拓宽 FFN 层的中间宽度，旨在获得更好的性能。
+- **宏观设计**：DeepSeek LLM 与其他模型不同，具体参数如下：
 
 | 模型 | Params | 层数 N | d_model | n_heads | 序列长度 | 学习率 | Batch Size | Tokens |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -64,7 +78,7 @@ DeepSeek 使用一个高效且轻量级的训练框架，名为 HAI-LLM（萤火
 
 缩放定律表明，随着计算预算 C、模型规模 N 和数据规模 D 的增加，模型性能可以得到可预测的改善。当模型规模由模型参数表示，数据规模由 token 数表示时，计算预算 $C$ 可以近似为 $C=6ND$。
 
-为了降低实验成本和拟合难度，DeepSeek 采用了 Chinchilla 中的 IsoFLOP profile 方法来拟合缩放曲线。为了更准确地表示模型规模，使用一种新的模型规模表示方法，即非嵌入 FLOPs/token M，替换了先前使用的模型参数 N，并将近似计算预算公式 $C=6ND$ 替换为更精确的 $C=MD$。实验结果给出了关于最佳模型/数据扩展分配策略和性能预测的见解，并准确地预测了 DeepSeek LLM 7B 和 67B 模型的预期性能。
+为了降低实验成本和拟合难度，DeepSeek 采用了 Chinchilla 中的 IsoFLOP profile 方法来拟合缩放曲线。为了更准确地表示模型规模，使用一种新的模型规模表示方法，即 *非嵌入 FLOPs/token M*，替换了先前使用的模型参数 N，并将近似计算预算公式 $C=6ND$ 替换为更精确的 $C=MD$。实验结果给出了关于最佳模型/数据扩展分配策略和性能预测的见解，并准确地预测了 DeepSeek LLM 7B 和 67B 模型的预期性能。
 
 > [!NOTE] DeepSeek 在缩放定律方面的贡献和发现可以总结如下：
 > 
@@ -159,9 +173,9 @@ DeepSeek Chat 存在一些局限性，如*知识更新滞后、可能生成非�
 
 ### 4.6.2 DeepSeek-V2
 
-DeepSeek-V2 采用了包括多头潜在注意力 MLA 和 DeepSeekMoE 在内的创新架构。MLA 通过将 KV 缓存大幅压缩成一个潜在向量来保证高效的推理过程，而 DeepSeekMoE 则采用大量的小参数专家进行建模，同时在训练和推理上加入了更多的优化。沿袭了一贯的作风，DeepSeek 对模型进行了完全的 MIT 协议开源，可以商用。对于算力不是那么充足的开发者，官方提供了 API 调用的方案，费用更是达到了全场最低。
+DeepSeek-V2 采用了包括多头潜在注意力 MLA 和 DeepSeekMoE 在内的创新架构。*MLA 通过将 KV 缓存大幅压缩成一个潜在向量来保证高效的推理过程*，而 *DeepSeekMoE 则采用大量的小参数专家进行建模*，同时在训练和推理上加入了更多的优化。沿袭了一贯的作风，DeepSeek 对模型进行了完全的 MIT 协议开源，可以商用。对于算力不是那么充足的开发者，官方提供了 API 调用的方案，费用更是达到了全场最低。
 
-DeepSeek-V2 模型参数量方面达到 236B，每次处理 token 时激活其中的 21B 个，同时由于模型小型专家的特性，模型在推理时的激活参数很少，可以实现高推理速度。在通用能力的表现上，模型在 MMLU 多选题 benchmark 上取得了不错的成绩，DeepSeek-V2 在众多开源模型中表现仅次于 70B 的 LLaMA-3。在成本效率方面，相比 V1 的稠密模型，V2 模型节约了 42.5% 的训练成本，减少了推理时 93.3% 的 KV 缓存占用，将生成的吞吐量也提升到了原来的 5.76 倍。借助 YaRN 优化的长度外推训练方法，模型的上下文能力得以扩展到了 128k 大小。
+DeepSeek-V2 模型参数量方面达到 *236B，每次处理 token 时激活其中的 21B 个*，同时由于模型小型专家的特性，模型在推理时的激活参数很少，可以实现高推理速度。在通用能力的表现上，模型在 MMLU 多选题 benchmark 上取得了不错的成绩，DeepSeek-V2 在众多开源模型中表现仅次于 70B 的 LLaMA-3。在成本效率方面，相比 V1 的稠密模型，V2 模型 *节约了 42.5% 的训练成本，减少了推理时 93.3% 的 KV 缓存占用，将生成的吞吐量也提升到了原来的 5.76 倍*。借助 YaRN 优化的长度外推训练方法，模型的上下文能力得以扩展到了 *128k* 大小。
 
 DeepSeek-V2 在一个包含 `8.1T token` 的高质量多源语料库上进行了预训练，并进一步进行了监督微调 SFT 和强化学习 RL，以充分挖掘其潜力。评估结果显示，即使仅激活了 21B 个参数，DeepSeek-V2 及其 Chat 版本在开源模型中依然达到了顶级性能。
 
@@ -169,7 +183,7 @@ DeepSeek-V2 在一个包含 `8.1T token` 的高质量多源语料库上进行了
 
 对于 DeepSeek-V2 的模型结构来说，主要有多头潜在注意力 MLA 和 DeepSeekMoE 两个方面，如右图所示，这在本书“模型架构”章节的“注意力改进”及“FFN 改进”部分有详细的介绍，这里不再赘述。
 
-- **MHA 中 KV cache 会成为推理瓶颈** 。MQA 和 GQA 可以在一定程度上减少 KV cache，但效果上不如 MHA。DeepSeek-V2 设计了 **MLA**，通过低秩 key-value 联合压缩，实现了比 MHA 更好的效果且需要的 KV cache 要小很多。
+- **MHA 中 KV cache 会成为推理瓶颈** 。MQA 和 GQA 可以在一定程度上减少 KV cache，但效果上不如 MHA。DeepSeek-V2 设计了 **MLA**，通过 *低秩 key-value 联合压缩*，实现了比 MHA 更好的效果且需要的 KV cache 要小很多。
 - **DeepSeek-V2 的 Transformer Block × L** 由输入层、RMS Norm、Attention、RMS Norm、Feed-Forward Network（DeepSeekMoE）叠加组成，输出即为本轮变换的隐层。DeepSeekMoE 中将 FFN 拆分为一个可见的所有共享的 shared expert 1 以及 N_S 个路由中的 Routed Expert（编码时为 $[1, N_S], [N_r]_{i=1}^{N_r}$ 的表现形式，带 Router 和 Top-K 选择）。
 
 
@@ -234,7 +248,7 @@ $$
 A_i = \frac{r_i - \operatorname{mean}(\{r_1, r_2, \dots, r_G\})}{\operatorname{std}(\{r_1, r_2, \dots, r_G\})}
 $$
 
-**GRPO 与 PPO 的区别**：PPO 会额外训练一个与策略模型相同规模的评论家（Value）模型，并通过 GAE 计算优势；GRPO 则放弃评论家模型，直接从一组输出的相对奖励估计优势，省去了大量训练成本。
+**GRPO 与 PPO 的区别**：PPO 会额外训练一个与策略模型相同规模的评论家（Value）模型，并通过 GAE 计算优势；*GRPO 则放弃评论家模型，直接从一组输出的相对奖励估计优势*，省去了大量训练成本。
 
 ![[Pasted image 20260810105406.png|600]]
 
@@ -287,9 +301,9 @@ DeepSeek-V2.5 的能力得到了很大的提升：
 
 ### 4.6.3 DeepSeek-V3
 
-DeepSeek-V3 也是 MoE 语言模型，总共有 671B 参数，每次处理标记时激活 37B 参数。为了实现高效的推理和经济性的训练，DeepSeek-V3 采用了在 DeepSeek-V2 中使用过的 MLA 和 DeepSeekMoE 架构。此外，DeepSeek-V3 首创了无辅助损失的负载均衡策略，并设定了多 Token 预测训练目标以增强性能。
+DeepSeek-V3 也是 MoE 语言模型，总共有 *671B 参数，每次处理标记时激活 37B 参数*。为了实现高效的推理和经济性的训练，DeepSeek-V3 采用了在 DeepSeek-V2 中使用过的 MLA 和 DeepSeekMoE 架构。此外，DeepSeek-V3 *首创了无辅助损失的负载均衡策略，并设定了多 Token 预测训练目标*以增强性能。
 
-DeepSeek-V3 在 14.8T 个多样化且高质量的 token 上进行预训练，随后通过监督微调和强化学习阶段来充分发挥其能力。实验显示 DeepSeek-V3 超越了其他开源模型，且达到了与领先的闭源模型相当的性能，而且 DeepSeek-V3 的完整训练仅需 2.788M H800 GPU 小时。
+DeepSeek-V3 在 14.8T 个多样化且高质量的 token 上进行预训练，随后通过监督微调和强化学习阶段来充分发挥其能力。实验显示 DeepSeek-V3 超越了其他开源模型，且达到了与领先的闭源模型相当的性能，而且 DeepSeek-V3 的完整训练仅需 *2.788M H800 GPU 小时*。
 
 #### 模型结构
 
@@ -313,7 +327,7 @@ $$
 
 其中 $N_s$ 和 $N_r$ 分别表示共享专家和路由专家的数量，$FFN_i^{(s)}(\cdot)$ 和 $FFN_i^{(r)}(\cdot)$ 分别表示第 $i$ 个共享专家和第 $i$ 个路由专家，$K_r$ 表示激活的路由专家数量，$g_{i,t}$ 是第 $i$ 个专家的门控值，$s_{i,t}$ 是 token 到专家的亲和度，$e_i$ 是第 $i$ 个路由专家的质心向量，$\text{Topk}(\cdot, K)$ 表示在所有路由专家中为第 $t$ 个 token 计算的亲和度分数中最高的 $K$ 个分数的集合。与 DeepSeek-V2 不同的是，DeepSeek-V3 使用 Sigmoid 函数计算亲和度分数，并对所有选定的亲和度分数进行归一化以生成门控值。
 
-- **无辅助损失的负载均衡策略**：对于 MoE 模型来说，专家负载不平衡会导致路由崩溃并降低专家并行下的计算效率。传统解决方案通常依靠辅助损失来避免负载不平衡。然而，过大的辅助损失会损害模型性能。为了在负载均衡和模型性能之间取得更好的平衡，DeepSeek-V3 提出了一种无辅助损失的负载均衡策略。具体来说，为每个专家引入一个偏置项 $b_i$，并将其添加到相应的亲和度分数 $s_{i,t}$ 中，以确定 TopK 路由：
+- **无辅助损失的负载均衡策略**：对于 MoE 模型来说，专家负载不平衡会导致路由崩溃并降低专家并行下的计算效率。传统解决方案通常依靠辅助损失来避免负载不平衡。然而，过大的辅助损失会损害模型性能。为了在负载均衡和模型性能之间取得更好的平衡，DeepSeek-V3 提出了一种*无辅助损失的负载均衡策略*。具体来说，*为每个专家引入一个偏置项 $b_i$，并将其添加到相应的亲和度分数 $s_{i,t}$ 中，以确定 TopK 路由*：
 
 $$
 g_{i,t} = \begin{cases} s_{i,t}, & s_{i,t} + b_i \in \text{Topk}(\{s_{j,t} + b_j : 1 \le j \le N_r\}, K_r) \\[4pt] 0, & \text{otherwise} \end{cases}
@@ -335,7 +349,7 @@ $$
 
 ##### 多 Token 预测 MTP
 
-DeepSeek-V3 探索并设置了多 Token 预测目标，将预测范围扩展到每个位置的多个未来 token。这种方法具有双重优势：一方面，MTP 目标能够使训练信号更加密集，有望提升数据使用效率；另一方面，MTP 使模型能够预先规划其表示，从而更好地预测未来 token。
+DeepSeek-V3 探索并设置了多 Token 预测目标，将预测范围扩展到每个位置的多个未来 token。这种方法具有双重优势：一方面，*MTP 目标能够使训练信号更加密集，有望提升数据使用效率*；另一方面，*MTP 使模型能够预先规划其表示，从而更好地预测未来 token*。
 
 ![[Pasted image 20260810105604.png|600]]
 
@@ -433,29 +447,73 @@ DeepSeek-V3 的跨节点专家并行因通信开销导致计算与通信效率�
 
 ##### 推理和部署
 
-在 H800 集群上部署 DeepSeek-V3，每个节点内的 GPU 通过 NVLink 互联，整个集群的所有 GPU 则通过 IB 完全互联。为了确保在线服务的 SWE 目标（SLO）和高吞吐量，采用了以下部署策略，将预填充阶段和解码阶段分离：
+DeepSeek-V3 部署在 H800 集群上：
 
-1. **预填充**：预填充阶段的最小部署单元由 4 个节点组成，每个节点 8 个 GPU（共 32 个 GPU）。注意力部分采用 4 路张量并行（TP4）与序列并行（SP）结合，并结合 8 路数据并行（DP8）。MoE 部分使用 32 路专家并行（EP32），确保每个专家有足够大的批量以提高计算效率。MoE 的 all-to-all 通信首先通过 IB 在节点之间传输 Token，然后通过 NVLink 在节点内的 GPU 之间转发。浅层中使用 4 路张量并行以节省通信开销。为了实现负载均衡，引入了冗余专家策略，复制高负载专家并定期调整其部署（例如每 10 分钟一次）。每个 GPU 除了托管原始 8 个专家外，还托管一个冗余专家。为提高吞吐量，同时处理两个具有相似计算负载的微批次，重叠注意力层和 MoE 计算与分发、组合操作。此外，还在探索一种动态冗余策略，其中每个 GPU 托管更多专家（如 16 个），但在每个推理步骤中仅激活 9 个专家。
+- **节点内通信**：GPU 通过 NVLink 互联；
+- **跨节点通信**：集群全部 GPU 通过 IB 完全互联；
+- **服务目标**：为满足在线服务的 SWE 目标（SLO）和高吞吐量，将预填充阶段与解码阶段分离部署。
 
-2. **解码**：解码过程中，共享专家被视为一个被路由的专家，每个 Token 选择 9 个专家，其中共享专家总是被选中。解码阶段的最小部署单元由 4 个节点组成，共 320 个 GPU。注意力部分采用 TP4 与 SP 结合，并结合 DP80，而 MoE 部分使用 EP320。每个 GPU 仅托管一个专家，64 个 GPU 负责托管冗余专家和共享专家。所有到所有通信通过 IB 上的直接点对点传输执行，利用 IBGDA 技术进一步减少延迟并提高通信效率。根据在线服务的统计专家负载，定期确定冗余专家集合，但无需重新排列专家。同时，还需优化全局最优路由方案算法及与调度内核的融合以减少开销。
+1. **预填充**
+   - **部署单元**：4 个节点 × 8 个 GPU，共 **32 个 GPU** 。
+   - **注意力并行**：4 路张量并行（TP4）与序列并行（SP）结合，并采用 8 路数据并行（DP8）。
+   - **MoE 并行**：采用 32 路专家并行（EP32），保证每个专家拥有足够大的批量以提高计算效率。
+   - **通信路径**：MoE 的 all-to-all 通信先通过 IB 在节点之间传输 Token，再通过 NVLink 在节点内 GPU 之间转发；浅层采用 4 路张量并行以节省通信开销。
+   - **负载均衡**：引入冗余专家策略，复制高负载专家并定期调整部署（例如每 10 分钟一次）。每个 GPU 除托管原始 8 个专家外，还托管 1 个冗余专家。
+   - **吞吐优化**：同时处理两个计算负载相近的微批次，将注意力层与 MoE 计算同分发、组合操作重叠。
+   - **探索方向**：动态冗余策略下，每个 GPU 可托管更多专家（如 16 个），但每个推理步骤仅激活 9 个专家。
+
+2. **解码**
+   - **专家选择**：共享专家被视为一个路由专家；每个 Token 选择 9 个专家，其中共享专家始终被选中。
+   - **部署单元**：4 个节点，共 **320 个 GPU** 。
+   - **注意力并行**：采用 TP4 与 SP 结合，并采用 DP80。
+   - **MoE 并行**：采用 EP320；每个 GPU 仅托管 1 个专家，64 个 GPU 负责托管冗余专家和共享专家。
+   - **通信与延迟**：所有到所有通信通过 IB 上的直接点对点传输执行，并利用 IBGDA 进一步降低延迟、提高通信效率。
+   - **负载均衡**：根据在线服务的统计专家负载定期确定冗余专家集合，但无需重新排列专家；同时需优化全局最优路由算法及其与调度内核的融合，以降低开销。
 
 #### 预训练
 
 ##### 数据
 
-- **优化预训练语料库**：与 DeepSeek-V2 相比，DeepSeek-V3 通过增加数学和编程样本的比例优化了预训练语料库，并将多语言覆盖范围扩展至英语和中文之外。改进的数据处理流程减少了冗余，同时保持了语料库的多样性。采用文档打包方法确保数据完整性，但在训练期间不使用跨样本注意力掩码。DeepSeek-V3 的训练语料库包含 14.8T 高质量和多样化的 token。
-- **中间填充策略（FIM）**：在 DeepSeek-Coder-V2 训练过程中观察到，中间填充（Fill-In-Middle）策略不会无助于下一个 token 的预测能力，反而使模型能够根据上下文线索准确预测中间文本。因此，在 DeepSeek-V3 的预训练中也采用了 FIM 策略。具体实现采用前缀-后缀-中间（PSM）框架：
+- **优化预训练语料库**
+  - 相比 DeepSeek-V2，提高数学和编程样本比例，并将多语言覆盖扩展至英语和中文之外。
+  - 改进数据处理流程以减少冗余，同时保持语料多样性。
+  - 采用文档打包方法确保数据完整性；训练期间不使用跨样本注意力掩码。
+  - 训练语料库包含 **14.8T** 高质量、多样化 token。
+
+- **中间填充策略（FIM）**
+  - 在 DeepSeek-Coder-V2 训练中观察到，Fill-In-Middle 策略不会无助于下一个 token 的预测能力，反而能让模型依据上下文线索准确预测中间文本。
+  - 因此 DeepSeek-V3 的预训练也采用 FIM，并具体使用前缀-后缀-中间（PSM）框架：
 
 ![[Pasted image 20260810105946.png|600]]
 
-此结构作为文档级预打包过程的一部分应用，FIM 策略的应用率为 0.1。
+  - 该结构作为文档级预打包过程的一部分应用，FIM 策略的应用率为 **0.1** 。
 
-- **Tokenizer 改进**：DeepSeek-V3 的 tokenizer 采用 BBPE，词汇量扩展至 128K。新的预分词器经过改进，优化了多语言压缩效率，并引入了结合标点符号和换行符的 token。然而，这种技术可能导致没有结尾换行符的多行提示词出现 token 边界偏差，特别是在少样本学习评估提示词中。为解决该问题，在训练期间随机拆分一定比例的组合 token，使模型接触更多特殊情况，从而减轻偏差。
+- **Tokenizer 改进**
+  - 采用 BBPE，词汇量扩展至 **128K** 。
+  - 改进预分词器，优化多语言压缩效率，并引入结合标点符号和换行符的 token。
+  - 潜在问题：没有结尾换行符的多行提示词可能出现 token 边界偏差，尤其是在少样本学习评估提示词中。
+  - 缓解方法：训练期间随机拆分一定比例的组合 token，使模型接触更多特殊情况，从而减轻偏差。
 
 ##### 超参数
 
-- **模型超参数**：DeepSeek-V3 的 Transformer 层数量设置为 61，隐藏层维度为 7168。所有可学习参数以 0.006 的标准差随机初始化。在 MLA 中，注意力头数设置为 128，每个头维度为 128，KV 压缩维度为 512，查询压缩维度为 1536。解耦的 Query 和 Key 每头维度为 64。除前三层外，所有 FFN 层被 MoE 层替换，每个 MoE 层包含 1 个共享专家和 256 个路由专家，每个专家的中间隐藏层维度为 2048。每个 token 激活 8 个专家，并确保每个 token 最多发送到 4 个节点。MTP 深度设置为 1。采用额外的 RMSNorm 层并乘以缩放因子。模型总参数量为 671B，其中每 token 激活 37B 参数。
-- **训练超参数**：使用 AdamW 优化器，$\beta_1=0.9$，$\beta_2=0.95$，weight_decay=0.1。预训练最大序列长度为 4K，在 14.8T 个 token 上进行预训练。学习率调度：前 2K 步线性增加到 $2.2\times 10^{-4}$，保持到消耗 10T 个 token；随后 4.3T 个 token 内按余弦衰减至 $2.2\times 10^{-4}$；最后 500B 个 token 中前 333B 保持 $2.2\times 10^{-4}$，剩余 167B 切换至 $7.3\times 10^{-4}$。梯度裁剪范数 1.0。批量大小从训练初期 3072 逐步增加到 15360，随后保持不变。不同层通过流水线并行部署在不同 GPU，每层路由专家均匀分布在 64 个 GPU 上（属于 8 个节点）。每个 token 最多发送到 4 个节点。无辅助损失平衡偏差更新速度：前 14.3T 个 token 为 0.001，其余 500B 为 0。平衡损失权重设为 0.0001，MTP 损失权重前 10T 为 0.3，剩余 4.8T 为 0.1。
+- **模型超参数**
+  - **骨干网络**：Transformer 共 **61 层**；隐藏层维度为 **7168**；所有可学习参数以标准差 **0.006** 随机初始化。
+  - **MLA**：注意力头数 **128**；每头维度 **128**；KV 压缩维度 **512**；查询压缩维度 **1536**；解耦的 Query 和 Key 每头维度 **64** 。
+  - **MoE**：除前 3 层外，所有 FFN 层替换为 MoE 层。每层含 **1 个共享专家** 和 **256 个路由专家**；每个专家的中间隐藏层维度为 **2048** 。
+  - **路由**：每个 token 激活 **8 个专家**，且最多发送到 **4 个节点** 。
+  - **其他设置**：MTP 深度为 **1**；采用额外 RMSNorm 层并乘以缩放因子。
+  - **参数量**：总参数量 **671B**，每个 token 激活 **37B** 参数。
+
+- **训练超参数**
+  - **优化器**：AdamW，$\beta_1=0.9$、$\beta_2=0.95$、weight decay 为 **0.1** 。
+  - **训练规模**：最大序列长度 **4K**；在 **14.8T token** 上预训练。
+  - **学习率调度**：
+    1. 前 **2K** 步线性增加到 $2.2\times10^{-4}$，并保持至消耗 **10T token**；
+    2. 随后在 **4.3T token** 内按余弦衰减至 $2.2\times10^{-4}$；
+    3. 最后 **500B token** 中，前 **333B** 保持 $2.2\times10^{-4}$，剩余 **167B** 切换至 $7.3\times10^{-4}$。
+  - **稳定性与批量**：梯度裁剪范数 **1.0**；批量大小从训练初期 **3072** 逐步增加到 **15360**，随后保持不变。
+  - **并行与路由部署**：不同层通过流水线并行部署在不同 GPU；每层路由专家均匀分布在 **64 个 GPU** 上（属于 **8 个节点**）；每个 token 最多发送到 **4 个节点** 。
+  - **负载均衡与 MTP**：无辅助损失平衡偏差更新速度在前 **14.3T token** 为 **0.001**，其余 **500B** 为 **0**；平衡损失权重为 **0.0001**；MTP 损失权重前 **10T** 为 **0.3**，剩余 **4.8T** 为 **0.1** 。
 
 ##### 上下文扩展
 
@@ -499,3 +557,974 @@ A_i = \frac{r_i - \operatorname{mean}(\{r_1, r_2, \dots, r_G\})}{\operatorname{s
 $$
 
 在强化学习过程中，DeepSeek-V3 融入了来自不同领域的提示词，如编码、数学、写作、角色扮演和问答。这不仅让模型更贴近人类偏好，还提高了基准测试上的性能，尤其是在监督微调数据有限的情况下。
+
+
+
+----
+
+
+### 4.6.4 DeepSeek-R1
+
+DeepSeek-R1 的核心不是先模仿人工 CoT、再做小规模 RL，而是先证明 ==Base Model 可以直接通过可验证奖励学出长 CoT 推理行为==，再用冷启动、拒绝采样、通用 SFT 与偏好奖励，把这种能力修正成更可读、更符合用户偏好的产品形态。
+
+#### DeepSeek-R1-Zero：纯强化学习激发推理能力
+
+DeepSeek-R1-Zero 最关键的验证点是：==直接从 DeepSeek-V3-Base 出发，不做监督微调，不给人工写好的长 CoT 示例，只给可验证任务和规则奖励，让模型在 RL 中自己探索推理策略。==
+
+##### 1. 从 Base Model 直接做 RL
+
+DeepSeek-R1-Zero 的训练起点是 *DeepSeek-V3-Base*，而不是经过指令 SFT 或 CoT SFT 的模型。这个设计的假设是：人工定义的推理格式可能把模型锁进“人类示范的推理路径”，而直接 RL 可以让模型探索非人工模板化的推理行为。训练设计 *只约束输出结构，不约束中间推理内容*，因此训练信号主要来自最终答案是否正确。
+
+> [!NOTE] 训练任务分布
+> - **数学**：可由最终答案匹配验证的定量推理题，答案可以是数字、表达式或方程。
+> - **代码**：算法竞赛题和 bug fixing 任务，可用编译、隐藏测试或单元测试验证。
+> - **STEM**：物理、化学、生物等多选题，用选项匹配给二值奖励。
+> - **逻辑**：真实和合成的逻辑题、code-IO 题、密码／约束／算术 puzzle 等可自动验证任务。
+
+从训练数据口径看，RL prompts 同时覆盖 reasoning 和 general 两类：reasoning 侧大致是数学 26K、代码算法题 17K、bug fixing 8K、STEM 22K、逻辑 15K；general 侧是 helpfulness 66K、harmlessness 12K。这些数量不是最终 SFT 样本数，而是 RL 阶段用来采样、打奖励和对齐通用偏好的 prompt 池。
+
+##### 2. GRPO
+
+GRPO *用同一问题的一组候选回答做相对优化，避免像 PPO 那样额外训练 value model*。做法是：对每个问题 $q$，从旧策略 $\pi_{old}$ 采样一组输出 $\{o_1, o_2, \ldots, o_G\}$，再用组内 reward 的相对位置计算优势函数。这样，模型不需要学习“这个回答绝对值是多少”，*只需要比较同组回答里谁更好*。
+
+![[Pasted image 20260810161917.png|600]]
+
+> [!TIP] 关键机制
+> 1. **组采样**：同一个问题采样 $G=16$ 个回答，并给每个回答计算规则奖励。
+> 2. **组内归一化**：将 reward 按组内均值和标准差归一化，得到 $A_i$。
+> 3. **更新约束**：用 clipped policy ratio 控制策略更新幅度，并加入相对 reference policy 的 KL 约束。
+> 4. **参考模型更新**：每 **400** 步用最新 policy 替换 reference model，使约束基线跟上训练进度。
+
+DeepSeek-R1-Zero 的主要超参是：learning rate 为 $3\mathrm{e}{-6}$，KL coefficient 为 $0.001$，rollout sampling temperature 为 $1$。每步包含 **32** 个不同问题、每题采样 **16** 个输出，因此每步 batch size 是 **512** 。
+
+- 前 **8.2K** step 的最大输出长度为 **32,768 tokens**，之后提升至 **65,536 tokens**；
+- 总训练 **10,400 steps**，约 **1.6 epochs**；
+- 工程上，每次 rollout 生成 **8,192** 条输出，再拆成 **16** 个 mini-batches 做 **1** 个 inner epoch。
+
+这相当于把采样批次和训练批次分开，保证每轮 GRPO 更新有足够多的组内比较样本。
+
+##### 3. 奖励设计
+
+R1-Zero 只使用规则奖励，主要由准确性奖励和格式奖励组成：
+
+$$
+\mathrm{Reward}_{rule}=\mathrm{Reward}_{acc}+\mathrm{Reward}_{format}
+$$
+
+- **准确性奖励**：检查最终答案是否正确。数学题要求答案落在指定格式中（例如 boxed answer），便于规则匹配；代码题可用编译器和测试用例判断是否通过。
+- **格式奖励**：要求模型显式把推理过程包在 `<think>` 与 `</think>` 中，把最终回答包在 `<answer>` 与 `</answer>` 中。
+
+> [!WARNING] 注意
+> 准确性奖励和格式奖励使用相同权重。这里**没有** 给中间推理步骤打分，也**没有** 要求推理过程符合某种人工模板。
+
+表 1 给出 DeepSeek-R1-Zero 的提示模板。模板只定义对话角色和 `<think>`／`<answer>` 的输出边界；训练时把具体问题替换到 `prompt` 位置。
+
+![[Pasted image 20260810162441.png|600]]
+
+##### 4. 自演化
+
+随着 RL 进行，模型会自然生成更长的推理链，并出现反思、验证和尝试替代解法等行为。图 1 记录了 R1-Zero 在 RL 过程中的两个同步变化：AIME 2024 的 pass@1 准确率从初始的 **15.6%** 提升到 **77.9%**，多数投票可达 **86.7%**；同时平均回答长度也显著增长。
+
+![[Pasted image 20260810162457.png|600]]
+
+这个现象可以理解为：在可验证奖励驱动下，模型学会为复杂问题分配更多推理时间。这种增长不是通过外部强制加长输出得到的，而是 reward 使长 CoT 在可验证任务上更容易得到正确答案，于是模型逐渐发展出“检查前一步、重新评估、探索另一条路径”等行为。
+
+表 2 是 Aha Moment 的一个中间样本：模型在推理中突然用 “wait” 之类表达重新审视已有步骤，说明反思行为可以从 RL 过程中自发出现。
+
+![[Pasted image 20260810162510.png|600]]
+
+> [!SUMMARY] 小结
+> R1-Zero 证明了：一个强 Base Model 加上可验证任务、规则奖励和足够算力，可以在没有人工长 CoT SFT 的情况下学出复杂推理行为。
+
+##### 5. 局限
+
+R1-Zero 的推理能力强，但输出不适合作为最终产品形态：
+
+1. **可读性差**：推理链可能冗长、格式混乱或难以阅读。
+2. **语言混杂**：由于 DeepSeek-V3-Base 训练语料包含多语言，尤其是中英混合，模型可能在同一个 CoT 中混用中文和英文。
+3. **任务覆盖较窄**：训练主要覆盖数学、代码、逻辑等可验证任务，对写作、开放域问答、角色扮演等通用场景帮助有限。
+
+#### DeepSeek-R1：冷启动与多阶段训练
+
+DeepSeek-R1 是把 R1-Zero 的推理能力转成更可用模型的多阶段管线：先用少量高质量长 CoT 做冷启动 SFT，再做面向推理的 RL，随后用拒绝采样构造约 **800K** SFT 数据，最后用混合数据和偏好奖励做第二阶段 RL。图 2 展示了 DeepSeek-R1 的多阶段流水线；图中 R1-Zero、R1 Dev-1、R1 Dev-2、R1 Dev-3 是中间检查点，最终 R1 来自第二阶段综合 RL。
+
+![[Pasted image 20260810162531.png|600]]
+
+##### 1. 冷启动 SFT
+
+用少量高质量长 CoT 数据让 Base Model 先学会更可读、更对话化的推理格式。冷启动的动机是产品体验，而不是单纯追求 benchmark：R1-Zero 虽然会推理，但推理文本不稳定；DeepSeek-R1 希望推理过程更像第一人称的自然思考，更容易被用户理解，同时保持与问题语言一致。
+
+> [!TIP] 冷启动数据构造
+> 1. **收集 prompts**：收集数千个高质量、多样化的 reasoning prompts。
+> 2. **采样推理轨迹**：用 DeepSeek-R1-Zero 在较高 temperature（$1.0$）下为每个 prompt 生成多条推理轨迹。
+> 3. **筛选正确样本**：只保留最终答案正确、格式可读的样本；数学样本用 SymPy 做解析和表达式比较。
+> 4. **过滤不可读 CoT**：用重复检测、语言混杂过滤等规则清理不可读 CoT。
+> 5. **DeepSeek-V3 改写**：改写 reasoning 和 summary，使格式更稳定、表达更友好，并将 thinking process 翻译成与问题相同的语言。
+> 6. **人工复核**：人工标注者二次检查 LLM 生成结果，保证质量和一致性。
+
+代码冷启动数据来自多平台在线评测题。代码侧整理了 Codeforces 的 **5,151** 道题和 AtCoder 的 **2,504** 道题；因为原始测试用例不公开，他们用 DeepSeek-V2.5 生成候选测试生成器，再用正确提交过滤无效测试，并用错误提交选择能区分正确／错误解法的测试子集。
+
+##### 2. 第一阶段面向推理的 RL
+
+在冷启动后的模型上继续用 GRPO 和规则奖励提升数学、代码、逻辑等任务的推理能力。第一阶段 RL 的训练机制继承 R1-Zero：learning rate 为 $3\mathrm{e}{-6}$，KL coefficient 为 $0.001$，rollout temperature 为 $1$，每题采样 **16** 个输出，最大长度 **32,768**，每步 **32** 个问题，batch size 为 **512** 。工程上同样采用每次 rollout **8,192** 条输出、**16** 个 mini-batches、**1** 个 inner epoch。
+
+这里将 GRPO clip ratio $\epsilon$ 设为 **10**；该系数很关键：过低会截断大量 token 的梯度，过高可能导致训练不稳定。为缓解语言混杂，可以加入语言一致性奖励，将其定义为 CoT 中目标语言词数占总词数的比例：
+
+$$
+\mathrm{Reward}_{\mathrm{language}}
+=
+\frac{\mathrm{Num}(\mathrm{Words}_{\mathrm{target}})}
+{\mathrm{Num}(\mathrm{Words})}
+$$
+
+> [!NOTE] 取舍
+> 语言一致性奖励会让输出更符合用户偏好、更易读，但通常会带来轻微性能下降。这是“能力最大化”和“可用性对齐”之间的典型取舍。
+
+##### 3. 模型奖励
+
+对通用任务，DeepSeek-R1 不再只靠规则奖励，而是训练 **helpfulness** 和 **safety** 两类奖励模型：
+
+- **helpfulness 奖励**：只关注最终 summary，不把 CoT 全部纳入评价，以减少对底层推理过程的干扰。
+- **harmlessness 奖励**：评价整个回答，包括推理过程和 summary，用来发现潜在风险、偏见或有害内容。
+
+$$
+\mathrm{Reward}_{\mathrm{helpful}}
+=
+\mathrm{RM}_{\mathrm{helpful}}(\mathrm{Response}_A, \mathrm{Response}_B)
+$$
+
+$$
+\mathrm{Reward}_{\mathrm{safety}}
+=
+\mathrm{RM}_{\mathrm{safety}}(\mathrm{Response})
+$$
+
+
+> [!NOTE] 奖励模型数据
+> 
+> - **helpful reward model**：使用 arena-hard prompt format 生成偏好对。每个偏好对让 DeepSeek-V3 判断 **4** 次，并随机交换 Response A／B 以降低位置偏差；只保留平均分差大于 **1** 的样本，最终约 **66K** 对。
+> - **safety reward model**：使用约 **106K** 个 prompt 和模型回答，按预设安全准则标注 safe／unsafe，并用 point-wise 方法训练。
+> - **训练设置**：batch size 为 **256**，learning rate 为 $6\mathrm{e}{-6}$，训练 **1** 个 epoch，最大长度为 **8,192 tokens**；推理打分时不显式限制长度。
+
+##### 4. 拒绝采样生成 SFT 数据
+
+从第一阶段 RL 模型中采样，筛掉错误和不可读样本，得到大规模监督数据。拒绝采样的目标是把 RL 模型已经学到的推理能力沉淀成更稳定的 SFT 语料。
+
+对每个 prompt 采样多个回答，只保留最终答案正确的样本；对一些不能用简单规则验证的数据，会把 ground truth 和模型预测一起交给 DeepSeek-V3 作为 generative reward model 判断 correctness。non-reasoning data 会复用 DeepSeek-V3 SFT 数据的一部分：复杂通用指令可以先生成潜在 reasoning，再给最终回答；hello、事实问答这类简单查询则直接回答，不强行插入 CoT。
+
+> [!NOTE] SFT 数据组成
+> 
+> 1. **reasoning data**：约 **600K** 条，来自数学、代码、STEM、逻辑等任务；过滤掉语言混杂、长段落和包含代码块的混乱 CoT。
+> 2. **non-reasoning data**：约 **200K** 条，覆盖写作、事实问答、自我认知、翻译、软件工程、前端开发等场景。
+> 3. **总规模**：表 5 统计为 **804,745** 条监督样本，平均轮数约 **1.0**，平均 tokens 约 **5,355.3** 。
+> 
+> | Domain | Num Samples | Avg Rounds | Avg Tokens | 说明 |
+> | --- | ---: | ---: | ---: | --- |
+> | Math | 395,285 | 1.0 | 6094.2 | 中英数学题，覆盖多难度层级。 |
+> | Code | 211,129 | 1.1 | 7435.7 | 竞赛编程、debugging、工程编码。 |
+> | STEM | 10,124 | 1.0 | 4928.8 | 教材和线上仓库中的理科题。 |
+> | Logic | 10,395 | 1.0 | 2739.0 | 逻辑、puzzle、可验证推理题。 |
+> | General | 177,812 | 1.1 | 1419.8 | 写作、开放问答、角色扮演等。 |
+> | **Total** | **804,745** | **1.0** | **5355.3** | 表 5 统计口径。 |
+> 
+
+##### 5. 通用 SFT
+
+用约 **800K** 样本训练模型，使推理能力和通用指令能力合并。
+
+这一步会把 reasoning 和 non-reasoning 数据一起放入 SFT。通用 SFT 的训练口径是：code-start SFT 和第二阶段 SFT 都使用 curated dataset 对 DeepSeek-V3-Base 微调 **2–3 epochs**，采用 cosine decay scheduler，学习率从 $5\mathrm{e}{-5}$ 衰减到 $5\mathrm{e}{-6}$，最大上下文 **32,768 tokens**，batch size 为 **128** 。
+
+##### 6. 第二阶段 RL
+
+同时优化推理准确性、通用 helpfulness 和 harmlessness，得到最终 DeepSeek-R1。
+
+第二阶段 RL 使用更混合的 prompt 分布。对 reasoning data，继续用 R1-Zero 的规则奖励指导数学、代码和逻辑任务；对 general data，使用 reward model 训练模型更 helpful 和 harmless；同时继续加入语言一致性奖励。
+
+$$
+\mathrm{Reward}
+=
+\mathrm{Reward}_{\mathrm{reasoning}}
++
+\mathrm{Reward}_{\mathrm{general}}
++
+\mathrm{Reward}_{\mathrm{language}}
+$$
+
+$$
+\mathrm{Reward}_{\mathrm{reasoning}}
+=
+\mathrm{Reward}_{\mathrm{rule}}
+$$
+
+$$
+\mathrm{Reward}_{\mathrm{general}}
+=
+\mathrm{Reward}_{\mathrm{reward\_model}}
++
+\mathrm{Reward}_{\mathrm{format}}
+$$
+
+第二阶段大部分超参与第一阶段相同，关键差别是 rollout temperature 降到 **0.7**，因为更高温度在这一阶段会导致生成不连贯。训练总共 **1,700 steps** 。其中 general instruction data 和 preference-based rewards 只在最后400steps 引入。这样做是为了降低 reward hacking 风险：偏好奖励训练太久，模型可能学会迎合 rewardmodel，而不是真正对齐用户意图。
+
+> [!TIP] 关于异步 RL / rollout 调度：官方未披露，不能默认存在
+> 
+> - 第一阶段推理 RL 明确沿用 R1-Zero 的 GRPO，第二阶段 RL 继续做综合对齐；但 **官方论文没有公开 rollout 调度器，也没有声称使用异步 RL**，因此 ==不能确认 DeepSeek 使用了异步更新==。
+> - 这**不等于** 短序列必然让 GPU 空等：推理引擎可用 continuous batching／packing 让已完成序列退出并调度其他请求，只是该组的训练样本仍须等齐。
+> - 异步 rollout／异步更新虽能提高设备利用率，却会增加**策略滞后（off-policy）** 问题，==GRPO／PPO 的稳定性会更难保证==。
+> - 结论：==官方公开材料描述了两阶段 RL 与 R1-Zero 的 GRPO，但未披露异步训练实现细节。==
+
+
+##### 7. 蒸馏
+
+用 R1 生成的数据训练 Qwen 和 Llama 系列小模型，把长 CoT 推理能力迁移出去。
+
+蒸馏部分只用 SFT，不包含 RL 阶段。蒸馏的目标是把高质量 teacher output 中的推理能力迁移到更小的开源基座上；后续也可以继续在小模型上接 RL 做能力强化。训练数据是 B.3.3 中约 **800K** 条由 DeepSeek-R1 生成的样本。
+
+> [!WARNING] 蒸馏本质：文本级监督，而非 logits 蒸馏
+> 
+> 蒸馏只做 SFT，把 R1 生成的文本轨迹（prompt → long CoT → answer）当作 ground truth 做下一个 token 预测，并**不传播 R1 内部每个 token 的概率分布** 。因此它属于**数据蒸馏／样本级蒸馏**，不是 logits／KL 蒸馏（对比：Qwen3 的"强到弱蒸馏"是 logits 级，见 [[Llama 和 Qwen 系列.md]]）。
+> 
+> 固有代价：==学生只能学到文本轨迹，无法 100% 复现 R1 的推理深度——这是文本蒸馏的固有损失==。
+
+| Distilled Model | Base Model | Initial LR |
+| --- | --- | ---: |
+| DeepSeek-R1-Distill-Qwen-1.5B | Qwen2.5-Math-1.5B | $1\mathrm{e}{-4}$ |
+| DeepSeek-R1-Distill-Qwen-7B | Qwen2.5-Math-7B | $8\mathrm{e}{-5}$ |
+| DeepSeek-R1-Distill-Qwen-14B | Qwen2.5-14B | $7\mathrm{e}{-5}$ |
+| DeepSeek-R1-Distill-Qwen-32B | Qwen2.5-32B | $6\mathrm{e}{-5}$ |
+| DeepSeek-R1-Distill-Llama-8B | Llama-3.1-8B | $5\mathrm{e}{-5}$ |
+| DeepSeek-R1-Distill-Llama-70B | Llama-3.3-70B-Instruct | $2\mathrm{e}{-5}$ |
+
+> [!TIP] 蒸馏训练设置
+> - **训练轮数**：对每个对应基座微调 **2–3 epochs** 。
+> - **学习率衰减**：使用 cosine decay，把学习率衰减到初始值的十分之一。
+> - **上下文长度**：最大上下文为 **32,768 tokens** 。
+> - **batch size**：batch size 为 **64** 。
+
+#### 方法总结
+
+DeepSeek-R1 的方法可以概括成两条线：R1-Zero 证明“规则奖励 + GRPO + 可验证任务”足以从 Base Model 中激发长 CoT 推理；R1 则把这种能力通过冷启动、SFT、偏好奖励和语言一致性修正成更可用的模型。
+
+| 模型/阶段 | 主要输入 | 训练信号 | 作用 |
+| --- | --- | --- | --- |
+| R1-Zero | Reasoning prompts | 准确性奖励 + 格式奖励 | 证明纯 RL 可激发推理。 |
+| 冷启动 SFT | 少量高质量长 CoT | 监督学习 | 改善可读性与语言一致性。 |
+| 第一阶段 RL | Reasoning prompts | 规则奖励 + 语言一致性 | 强化推理能力。 |
+| 拒绝采样 SFT | 约 **600K** 推理 + **200K** 通用数据 | 监督学习 | 合并推理与通用能力。 |
+| 第二阶段 RL | Diverse prompts | 规则奖励 + 偏好奖励 + 语言一致性 | 得到最终 R1。 |
+| 蒸馏 | R1 生成的约 **800K** 样本 | SFT | 迁移到 Qwen/Llama 小模型。 |
+
+> [!TIP] 一句话理解
+> - **R1-Zero**：先不要教模型怎么想，只奖励它把可验证题做对，并让格式可解析。
+> - **R1**：再把模型自己学出的推理能力整理成可读、稳定、通用且更安全的回答行为。
+> - **蒸馏**：最后用 R1 的高质量推理轨迹训练小模型，让推理能力以更低成本扩散。
+
+### 4.6.5 DeepSeek-V3.x
+
+> [!SUMMARY] DeepSeek-V3.1
+
+DeepSeek-V3.1 是在 DeepSeek-V3 基础架构上的重大迭代，标志着模型正式演进至智能体时代。在继承前代 MLA 和 MoE 架构的基础上，DeepSeek-V3.1 引入了 ==混合推理 Hybrid Inference== 范式，支持思考与非思考双模式平滑切换。通过对 **840B** 高性能 Token 的持续预训练，V3.1 实现了原生 **128K** 长上下文的扩展，并全面更新了 Tokenizer。在此基础上，**DeepSeek-V3.1-Terminus** 进一步解决了长文本输出中的语种混淆与乱码问题，并大幅增强了复杂代码与搜索智能体的多步规划能力。
+
+##### 1. 模型架构升级
+
+DeepSeek-V3.1 的底层权重在继承 V3 优良特性的同时，进行了深度增量训练与分词层面的重构。
+
+###### 840B Token 持续预训练
+
+> [!TIP] 
+> - **长上下文增量学习**：针对长文本和高难度推理场景，V3.1 基础模型 `V3.1-Base` 在 V3 的基础上，额外进行了 **840B** 高质量 Token 的持续预训练。
+> - **128K 窗口原生支持**：持续预训练的重点在于优化模型在长序列中的注意力分布和位置编码对齐。V3.1 在 API 与开源版本中，原生且稳定地支持高达 **128K** 的超长上下文窗口，显著降低了长文本推理时的困惑度。
+
+###### 分词器与 Chat 模板更新
+
+为了更好地适应混合推理模式和提升 Token 利用率，V3.1 更新了分词器配置和 Chat 模板。这一更新优化了特殊 Token 的编码效率，如 ==控制思考流启闭的显式标签==，降低了在长多轮对话中的 Prompt 序列长度。
+
+##### 2. 混合推理范式：Think 与 Non-Think 双模式
+
+DeepSeek-V3.1 的最大架构创新在于将 ==深度思考（推理）== 与 ==快速响应（常规对话）== 解耦，由单个模型同时支持两种截然不同的运行流。
+
+![[Pasted image 20260810163915.png|600]]
+
+
+
+> [!NOTE] 🌄 思考模式 deepseek-reasoner
+> 激活后，模型在输出最终答案前会进入一个密集的推理和反思阶段，即 `DeepSeek-V3.1-Think` 模块。相比于早期的推理型探索模型，如 `DeepSeek-R1-0528`，V3.1-Think 通过后训练策略的优化，*能够在更短的时间内完成深层推理并给出正确答案*。这种耗时减短并未牺牲准确率，而是通过精简无效的发散思考路径实现的。
+
+> [!NOTE] 🌰 非思考模式 deepseek-chat
+> 当用户不需要长链逻辑时，如 *日常问答、简单文案生成、低延迟翻译*，模型可一键切换为常规模式。此时不输出思考过程，直接生成最终文本，兼顾极高的吞吐量与极低的延迟。
+
+##### 3. 后训练优化
+
+DeepSeek-V3.1 被官方定义为 `迈向智能体时代的第一步`，这主要得益于其后训练阶段对智能体核心技能的定向爆破。
+
+###### 多步工具调用
+
+> [!TIP] 📚
+> - **严格工具调用**：在 Beta 阶段的 API 中，V3.1 实现了对结构化输出和 Function Calling 的严密控制。模型在面对复杂、嵌套的工具链时，能够严格遵循 JSON Schema 等既定规范，不会因长思维链的干扰而格式走样。
+> - **多步规划**：后训练阶段加入了大量智能体演练轨迹数据。模型在遭遇多步骤、长周期的 Agent 任务时，展现出极强的状态保持能力和中断恢复能力。
+
+###### 代码增强
+
+V3.1 在软件工程任务和终端模拟环境上的表现取得了大幅增长。当作为 **Code Agent** 运作时，它能够更精准地理解复杂的命令行交互、捕获异常报错并自发进行代码重构。
+
+##### 4. DeepSeek-V3.1-Terminus 演进
+
+针对 V3.1 初期发布后社区与用户的反馈，团队推出了新的版本迭代 `DeepSeek-V3.1-Terminus`，主要在模型输出稳定性上进行了关键补丁式升级。
+
+###### 语言一致性
+
+- **中英混杂修复**：在长文本、尤其是混杂代码和长推理的场景下，大模型经常会出现语种漂移，如用中文提问，模型推理几步后突然开始用英文混杂回复。Terminus 版本通过强化语种条件对齐，彻底解决了这一顽疾。
+- **异常字符消除**：修复了模型在高上下文、高温度采样下偶尔吐出无意义随机乱码或控制符的底层 Bug，显著提升了生成文本的鲁棒性。
+
+###### 搜索与代码智能体升级
+
+- **复杂搜索智能体**：提升了多步检索中的信息聚合能力。当面对需要跨网页、跨时间、多次交互的复杂搜索任务时，Terminus 版本在多级决策的稳定性上显著超越了 V3.1 的初始版。
+- **基准测试的稳定性**：在各大主流的 Agent 评测集上，DeepSeek-V3.1-Terminus 的输出方差更小，表现出极高的工业级落地可靠性。
+
+##### 5. 生态
+
+为了方便企业和开发者无缝替换现有方案，DeepSeek-V3.1 在接口层和生态开放上做出了重要适配：
+
+1. **Anthropic API 格式原生兼容**：针对大量基于 Claude 体系构建 Agent 框架的开发者，V3.1 提供了原生兼容 Anthropic API 格式的路由接口。开发者几乎无需修改上层代码，如工具调用格式和消息结构，即可直接实现热插拔式平替。
+2. **权重完全开源**：团队同时在 Hugging Face 平台上开源了 DeepSeek-V3.1-Base（基础模型）与 DeepSeek-V3.1 / DeepSeek-V3.1-Terminus（对齐后的 Chat/Reasoner 模型）的完整权重，继续坚定地走开源技术路线，赋能本地私有化部署。
+
+##### 总结
+
+DeepSeek-V3.1 及 Terminus 变体成功地在一个模型内部融合了 128K 长文本、Think/Non-Think 混合推理与高阶智能体三大核心能力。尽管如此，在面对极高并发和超大规模长上下文工具调用时，模型在多专家网络路由的动态负载上依然存在极致优化的空间。V3.1 系列凭借创新的混合推理双模切换和出色的智能体稳定性，提供了一个极具性价比的强大生产力底座。
+
+#### DeepSeek-V3.2
+
+##### 1. 模型结构
+
+DeepSeek-V3.2-Exp 相比 DeepSeek-V3.1-Terminus 唯一的架构改动，是通过持续训练引入 DSA（DeepSeek Sparse Attention）。DSA 主要由两个组件构成：Lightning Indexer 和细粒度的 token 选择机制。
+
+![[Pasted image 20260810164512.png|600]]
+
+Lightning Indexer 计算 Query token $h_t\in\mathbb{R}^d$ 与历史 token $h_s\in\mathbb{R}^d$ 之间的索引分数 $L_{t,s}$，用于决定 Query token 应选择哪些历史 token：
+
+$$
+L_{t,s}=\sum_{j=1}^{H_I}w_{t,j}\cdot\operatorname{ReLU}(q_{t,j}\cdot k_s)
+$$
+
+其中 $H_I$ 表示 Indexer 头的数量；$q_{t,j}$ 和 $w_{t,j}$ 由 Query token $h_t$ 推导而来；$k_s$ 由历史 token $h_s$ 推导而来。这里选择 ReLU 作为激活函数，以兼顾吞吐量。由于 Lightning Indexer 的头数较少，且可使用 FP8 实现，其计算效率非常出色。
+
+对于每个 Query token $h_t$，在获得索引分数 $\{L_{t,s}\}$ 后，细粒度 token 选择机制仅保留对应 Top-$k$ 索引分数的 key-value 项 $\{C_s\}$。随后，注意力输出 $u_t$ 通过 Query token $h_t$ 与稀疏选择的 key-value 项 $\{C_s\}$ 之间的注意力机制计算得出：
+
+$$
+u_t=\operatorname{Attn}\left(h_t,\left\{C_s\mid L_{t,s}\in\operatorname{Top\text{-}k}(L_{t,:})\right\}\right)
+$$
+
+由于 DeepSeek-V3.2-Exp 是从 DeepSeek-V3.1-Terminus 开始进行持续训练，作者基于 MLA（Multi-head Latent Attention）实例化 DSA。在内核层面，为提升计算效率，可以使每个 key-value 项被多个 Query 共享，即在 MLA 的 MQA 模式下实现 DSA，使得每个 Latent Vector（即 MLA 中的 key-value 项）被所有 Query 头共享，整体结构如下图。
+
+![[Pasted image 20260810164529.png|600]]
+
+##### 2. 训练
+
+以 DeepSeek-V3.1-Terminus 的权重为起点，通过持续预训练和后训练得到 DeepSeek-V3.2-Exp。
+
+###### 持续预训练
+
+DeepSeek-V3.2-Exp 的持续预训练包含两个阶段。两个阶段的训练数据分布都和 DeepSeek-V3.1-Terminus 所用的 128K 长上下文扩展数据完全一致。
+
+**Dense Warm-up 阶段**
+
+首先进行 Warm-up 阶段，用于初始化 Lightning Indexer。此阶段保留密集注意力机制，并冻结除 Lightning Indexer 外的所有模型参数。为使 Indexer 输出与主注意力分布对齐，对于第 $t$ 个 Query token，首先对所有注意力头的主注意力分数求和，再沿序列维度进行 $L_1$ 归一化，得到目标分布 $P_t$。基于 $P_t$，将 KL 散度损失设为 Indexer 的训练目标。
+
+Warm-up 阶段使用学习率 $10^{-4}$，仅训练 **1,000** 步；每步包含 **16** 条长度为 **128K** 的序列，总计训练 **2.1B token** 。
+
+**Sparse Training 阶段**
+
+完成 Indexer Warm-up 后，引入细粒度 token 选择机制，并优化所有模型参数，使模型适应 DSA 的稀疏模式。此时仍对齐 Indexer 输出与主注意力分布，但仅考虑被选中的 token 集合：
+
+$$
+S_t=\left\{s\mid L_{t,s}\in\operatorname{Top\text{-}k}(L_{t,:})\right\}
+$$
+
+这里将 Indexer 的输入从计算图中分离，实现独立优化：Indexer 的训练信号仅来自其对齐损失，而主模型仅依据语言建模损失优化。
+
+稀疏训练阶段使用学习率 $7.3\times10^{-6}$，并为每个 Query token 选择 **2,048** 个 key-value tokens。主模型与 Indexer 共同训练 **15,000** 步，每步包含 **480** 条长度为 **128K** 的序列，总计训练约 **943.7B token** 。
+
+###### 后训练
+
+之后进行后训练以生成最终的 DeepSeek-V3.2-Exp。后训练阶段同样采用与预训练阶段相同的稀疏注意力机制。DeepSeek-V3.2-Exp 的后训练流程、算法和数据均与 DeepSeek-V3.1-Terminus 完全一致。
+
+**专家蒸馏**
+
+针对每个任务，首先开发一个专门用于该特定领域的专家模型，所有专家模型均基于相同的预训练 DeepSeek-V3.2 权重微调。除写作任务和通用问答外，还涵盖五个专业领域：数学、竞赛编程、通用逻辑推理、智能体编码和智能体搜索。每个专家模型均通过大规模强化学习训练。
+
+此外，使用不同模型分别生成用于长链式推理的 thinking mode 和直接生成回答的 non-thinking mode 的训练数据。专家模型训练完成后，用于生成最终权重所需的领域特定数据。基于蒸馏数据训练的模型性能仅略低于领域专家模型，且通过后续 RL 训练可有效消除这一性能差距。
+
+**混合强化学习训练**
+
+采用 GRPO 进行强化学习训练。与之前 DeepSeek 模型采用多阶段强化学习不同，这里将推理、智能体和人类对齐训练合并为一个 RL 阶段。这在多个领域间有效平衡了性能，同时避免了多阶段训练范式常见的灾难性遗忘问题。
+
+- 对推理和智能体任务，采用基于规则的结果奖励、长度惩罚和语言一致性奖励；
+- 对通用任务，采用生成式奖励模型，其中每个 prompt 均有专属的评估标准。
+
+奖励设计主要权衡两点：
+
+1. 长度与准确性；
+2. 语言一致性与准确性。
+
+#### DeepSeek-V4
+
+相比 DeepSeek-V3，DeepSeek-V4 引入了几项升级：
+
+1. *流形约束超连接 mHC（Manifold-Constrained Hyper-Connections）*：用以强化传统的跨层残差连接。
+2. *混合注意力架构（Hybrid Attention Architecture）*：通过结合压缩稀疏注意力 CSA 和重度压缩注意力 HCA，提升超长上下文场景下的计算与存储效率。
+3. *Muon 优化器*：作为核心优化器用于更新模型的大部分参数。
+
+其余模块仍沿用 DeepSeek-V3 的设计。
+
+##### 1. 沿用 DeepSeek-V3 的设计
+
+###### MoE
+
+DeepSeek-V4 的 FFN 仍采用 DeepSeekMoE 范式，设置细粒度的路由专家（Routed Experts）和共享专家（Shared Experts），但有以下改进：
+
+- *亲和度激活函数升级*：不同于 DeepSeek-V3，V4 将计算专家亲和度得分（Affinity Scores）的激活函数从 Sigmoid 替换为 Sqrt(Softplus)。
+- *负载均衡*：除继续采用无辅助损失（Auxiliary-loss-free）的均衡策略外，还引入轻量级的序列级均衡损失（Sequence-wise balance loss），以防止单个序列内部出现极端的路由不平衡。
+- *路由解除限制*：V4 取消对路由目标节点数量的限制，重新设计并行策略以保持训练效率。
+- *Hash 路由*：V4 将网络最开始的几个 Transformer 块中的稠密 FFN 层替换为采用 Hash 路由的 MoE 层。Hash 路由策略通过预定义的哈希函数，直接根据输入 token ID 决定该 token 目标分配的专家。
+
+###### Multi-Token Prediction
+
+V4 和 V3 一样配置了 MTP 模块和相应的优化目标。鉴于 MTP 策略在 V3 中已得到充分验证，V4 系列直接沿用了这个策略，没有任何修改。
+
+##### 2. 流形约束超连接（Manifold-Constrained Hyper-Connections）
+
+DeepSeek-V4 引入流形约束超连接 mHC，用以强化相邻 Transformer 块之间传统的残差连接。相比朴素超连接 HC（Hyper-Connections），mHC 的核心思想是将残差映射约束在一个特定流形上，从而在保持模型表达能力的同时，增强信号跨层传播的稳定性。
+
+###### 标准超连接（Standard Hyper-Connections）
+
+标准 HC 将残差流（Residual Stream）的宽度扩大 $n_{hc}$ 倍。残差流的形状从 $\mathbb{R}^{d}$ 扩展至 $\mathbb{R}^{n_{hc}\times d}$，其中 $d$ 是实际层输入的隐藏层维度。设 $X_l\in\mathbb{R}^{n_{hc}\times d}$ 为第 $l$ 层之前的残差状态。HC 引入三个线性映射，其更新公式为：
+
+$$
+X_{l+1}=B_lX_l+C_lF_l(A_lX_l)
+$$
+
+其中 $F_l$ 表示第 $l$ 层，例如一个 MoE 层，其输入和输出形状均为 $\mathbb{R}^d$。由于实际的层输入 $A_lX_l\in\mathbb{R}^d$ 仍然是 $d$ 维，因此扩展的残差宽度并不影响内部层的设计。HC 将残差流宽度与实际隐藏层维度解耦，以极低的计算开销提供了一个互补的缩放轴，因为 $n_{hc}$ 通常远小于隐藏层维度 $d$。但实验发现在堆叠多个深层时，朴素 HC 的训练频繁表现出数值不稳定，阻碍了其规模的进一步扩大。
+
+###### 流形约束残差映射（Manifold-Constrained Residual Mapping）
+
+mHC 的核心创新在于将残差映射矩阵 $B_l$ 严格约束在双随机矩阵流形（伯克霍夫多面体，The Birkhoff polytope）$\mathcal{M}$ 上，从而增强信号跨层传播的稳定性：
+
+$$
+B_l\in\mathcal{M}:=\left\{M\in\mathbb{R}^{n\times n}\mid M\mathbf{1}_n=\mathbf{1}_n,\;\mathbf{1}_n^TM=\mathbf{1}_n^T,\;M\ge0\right\}
+$$
+
+这确保映射矩阵的谱范数 $\lVert B_l\rVert_2$ 被限制在 $1$ 以内，使得残差变换具有*非扩张性（Non-expansive）*。这增强了正向传播和反向传播过程中的数值稳定性。集合 $\mathcal{M}$ 在矩阵乘法下封闭，保证了深度堆叠 mHC 场景下的系统稳定性。为避免信号消除（Signal Cancellation）的风险，输入变换 $A_l$ 和输出变换 $C_l$ 也通过 Sigmoid 函数被约束为非负且有界。
+
+###### 动态参数化（Dynamic Parameterization）
+
+这三个线性映射的参数是动态生成的，由一个动态（输入依赖）组件和一个静态（输入独立）组件组合而成。给定输入 $X_l\in\mathbb{R}^{n_{hc}\times d}$，首先将其展平并归一化：
+
+$$
+\hat{X}_l=\operatorname{RMSNorm}(\operatorname{vec}(X_l))\in\mathbb{R}^{1\times n_{hc}d}
+$$
+
+然后生成未受约束的原始参数 $\tilde{A}_l\in\mathbb{R}^{1\times n_{hc}}$、$\tilde{B}_l\in\mathbb{R}^{n_{hc}\times n_{hc}}$ 和 $\tilde{C}_l\in\mathbb{R}^{n_{hc}\times1}$：
+
+$$
+\tilde{A}_l=\alpha_l^{\mathrm{pre}}\cdot(\hat{X}_lW_l^{\mathrm{pre}})+S_l^{\mathrm{pre}}
+$$
+
+$$
+\tilde{B}_l=\alpha_l^{\mathrm{res}}\cdot\operatorname{Mat}(\hat{X}_lW_l^{\mathrm{res}})+S_l^{\mathrm{res}}
+$$
+
+$$
+\tilde{C}_l=\alpha_l^{\mathrm{post}}\cdot(\hat{X}_lW_l^{\mathrm{post}})^T+S_l^{\mathrm{post}}
+$$
+
+其中 $W_l^{\mathrm{pre}},W_l^{\mathrm{post}}\in\mathbb{R}^{n_{hc}d\times n_{hc}}$ 以及 $W_l^{\mathrm{res}}\in\mathbb{R}^{n_{hc}d\times n_{hc}^2}$ 是用于生成动态组件的可学习参数；$\operatorname{Mat}(\cdot)$ 用于将大小为 $1\times n_{hc}^2$ 的向量重塑为 $n_{hc}\times n_{hc}$ 的矩阵；$S_l^{\mathrm{pre}}$、$S_l^{\mathrm{post}}$ 和 $S_l^{\mathrm{res}}$ 是可学习的静态偏置；$\alpha_l^{\mathrm{pre}}$、$\alpha_l^{\mathrm{res}}$、$\alpha_l^{\mathrm{post}}$ 是动态可学习的门控因子（Gating Factors），初始化为极小值。
+
+###### 应用参数约束（Applying Parameter Constraints）
+
+获得未约束的原始参数后，对其施加前述约束。
+
+*输入与输出映射*：使用 Sigmoid 函数 $\sigma(\cdot)$ 确保其非负与有界：
+
+$$
+A_l=\sigma(\tilde{A}_l)
+$$
+
+$$
+C_l=2\sigma(\tilde{C}_l)
+$$
+
+*残差映射*：为了将 $\tilde{B}_l$ 投影到双随机矩阵流形 $\mathcal{M}$ 上，模型采用 Sinkhorn–Knopp 算法：
+
+1. 对 $\tilde{B}_l$ 应用指数函数以确保其元素均为正数，得到 $M^{(0)}=\exp(\tilde{B}_l)$。
+2. 交替进行行归一化和列归一化：
+
+$$
+M^{(t)}=T_r\bigl(T_c(M^{(t-1)})\bigr)
+$$
+
+其中 $T_r$ 和 $T_c$ 分别表示行和列的归一化操作。这一迭代过程最终会收敛至一个满足约束的双随机矩阵 $B_l=M^{(t_{\max})}$。实际选择 $t_{\max}=20$ 作为迭代次数。
+
+##### 3. 基于 CSA 和 HCA 的混合注意力机制
+
+当上下文长度达到极端规模时，注意力机制将成为模型中最主要的计算瓶颈。为此，DeepSeek-V4 设计了两种高效的注意力架构：
+
+- 压缩稀疏注意力 CSA（Compressed Sparse Attention）
+- 重度压缩注意力 HCA（Heavily Compressed Attention）
+
+然后采用它们交错堆叠的混合配置，大幅降低长文本场景下的计算代价。
+
+###### 压缩稀疏注意力（Compressed Sparse Attention）
+
+![[Pasted image 20260810165123.png|600]]
+
+CSA 的核心逻辑是*先进行时间／序列维度的压缩，再应用稀疏选择进行加速*。
+
+> [!NOTE] ⭐ 压缩键-值条目
+> 设 $H\in\mathbb{R}^{n\times d}$ 为输入隐藏状态序列，其中 $n$ 为序列长度，$d$ 为隐藏层大小。CSA 首先计算两组 KV 条目 $C^a,C^b\in\mathbb{R}^{n\times c}$ 及其对应的压缩权重 $Z^a,Z^b\in\mathbb{R}^{n\times c}$，其中 $c$ 为注意力头维度：
+>
+> $$
+> C^a=H\cdot W^{aKV},\qquad C^b=H\cdot W^{bKV}
+> $$
+>
+> $$
+> Z^a=H\cdot W^{aZ},\qquad Z^b=H\cdot W^{bZ}
+> $$
+>
+> 其中 $W^{aKV},W^{bKV},W^{aZ},W^{bZ}\in\mathbb{R}^{d\times c}$ 为可训练参数。
+>
+> 接下来，根据压缩权重和可学习的位置偏置 $B^a,B^b\in\mathbb{R}^{m\times c}$，每 $m$ 个原生 KV 条目将被压缩为一个条目，生成 $C^{\mathrm{Comp}}\in\mathbb{R}^{\frac{n}{m}\times c}$。每个压缩后的条目 $C_i^{\mathrm{Comp}}\in\mathbb{R}^c$ 计算如下：
+>
+> $$
+> \left[S^a_{m i:m(i+1)-1};\;S^b_{m(i-1):mi-1}\right]
+> =\operatorname{Softmax}_{\mathrm{row}}\left(\left[Z^a_{m i:m(i+1)-1}+B^a;\;Z^b_{m(i-1):mi-1}+B^b\right]\right)
+> $$
+>
+> $$
+> C_i^{\mathrm{Comp}}
+> =\sum_{j=mi}^{m(i+1)-1}S_j^a\odot C_j^a
+> +\sum_{j=m(i-1)}^{mi-1}S_j^b\odot C_j^b
+> $$
+>
+> 这里 $\odot$ 表示哈达玛积（Hadamard product），即元素对应相乘；$\operatorname{Softmax}_{\mathrm{row}}(\cdot)$ 表示沿行维度的 Softmax 操作，即对来自 $Z^a$ 和 $Z^b$ 的总计 $2m$ 个元素进行归一化。当 $i=0$ 时，对 $Z^b$ 的相关部分填充负无穷，对 $C^b$ 部分填充 $0$。尽管每个 $C_i^{\mathrm{Comp}}$ 由 $2m$ 个原 KV 条目导出，但用于 $C_i^{\mathrm{Comp}}$ 的 $C^b$ 索引与用于 $C_{i-1}^{\mathrm{Comp}}$ 的 $C^a$ 索引是重叠的。因此 CSA 实际上将序列长度精确压缩到了原先的 $\frac{1}{m}$。
+
+> [!NOTE] 🥖 用于稀疏选择的 Lightning Indexer
+> 在获取压缩 KV 条目 $C^{\mathrm{Comp}}$ 后，CSA 采用 DSA 策略挑选出 Top-$k$ 个压缩条目参与核心注意力计算：
+>
+> 1. 执行与 $C^{\mathrm{Comp}}$ 完全相同的压缩操作，获取 Compressed Indexer Keys $K^{I\mathrm{Comp}}\in\mathbb{R}^{\frac{n}{m}\times c^I}$，其中 $c^I$ 为 indexer 头维度。
+> 2. 对于一个 Query token $t$，通过低秩分解的方式生成一组 indexer query 向量 $\{q^I_{t,1};q^I_{t,2};\ldots;q^I_{t,n_h^I}\}=q_t^I$：
+>
+> $$
+> c_t^Q=h_t\cdot W^{DQ}
+> $$
+>
+> $$
+> q_t^I=c_t^Q\cdot W^{IUQ}
+> $$
+>
+> 其中 $h_t\in\mathbb{R}^d$ 是 Query token $t$ 的隐藏状态；$c_t^Q\in\mathbb{R}^{d_c}$ 是压缩后的 Query 隐向量，压缩维度为 $d_c$；$n_h^I$ 为 indexer query 的数量；$W^{DQ}\in\mathbb{R}^{d\times d_c}$ 和 $W^{IUQ}\in\mathbb{R}^{d_c\times c^I n_h^I}$ 分别是用于 indexer 查询的下投影和上投影矩阵。
+> 3. 计算 Query token $t$ 与前方某个压缩块 $s\;(s<\lfloor\frac{t}{m}\rfloor)$ 之间的 Index Score $I_{t,s}\in\mathbb{R}$：
+>
+> $$
+> [w^I_{t,1};w^I_{t,2};\ldots;w^I_{t,n_h^I}]=w_t^I=h_t\cdot W^w
+> $$
+>
+> $$
+> I_{t,s}=\sum_{h=1}^{n_h^I}w^I_{t,h}\cdot\operatorname{ReLU}\left(q^I_{t,h}\cdot k_s^{I\mathrm{Comp}}\right)
+> $$
+>
+> 其中 $W^w\in\mathbb{R}^{d\times n_h^I}$ 是可学习矩阵，$w^I_{t,h}$ 是第 $h$ 个 indexer 头的权重。
+> 4. 利用 Top-$k$ 选择器，显式挑选并保留得分最高的一子集压缩 KV 条目：
+>
+> $$
+> C_t^{\mathrm{SprsComp}}=\left\{C_s^{\mathrm{Comp}}\mid I_{t,s}\in\operatorname{Top\text{-}k}(I_{t,:})\right\}
+> $$
+
+> [!NOTE] ⛺ 共享 KV 的 MQA
+> 选定稀疏 KV 条目后，CSA 以 MQA 的方式执行核心注意力计算，每个 $C_t^{\mathrm{SprsComp}}$ 中的压缩条目同时充当 Attention 的 Key 和 Value。对于 Query token $t$，其 Attention Queries 同样从共享的隐向量 $c_t^Q$ 中上投影生成：
+>
+> $$
+> [q_{t,1};q_{t,2};\ldots;q_{t,n_h}]=q_t=c_t^Q\cdot W^{UQ}
+> $$
+>
+> 其中 $n_h$ 为 Query 头的数量，$W^{UQ}\in\mathbb{R}^{d_c\times cn_h}$ 为上投影矩阵。随后在 $\{q_{t,i}\}$ 和 $C_t^{\mathrm{SprsComp}}$ 上执行核心注意力操作：
+>
+> $$
+> o_{t,i}=\operatorname{CoreAttn}(\operatorname{query}=q_{t,i},\operatorname{key}=C_t^{\mathrm{SprsComp}},\operatorname{value}=C_t^{\mathrm{SprsComp}})
+> $$
+
+> [!NOTE] 🦄 分组输出投影
+> 由于 $cn_h$ 的值非常大，如果直接将核心注意力的输出 $o_t\in\mathbb{R}^{cn_h}$ 投影回 $d$ 维隐藏状态，会带来高昂的计算负担。为降低成本，V4 设计了分组输出投影策略：将 $n_h$ 个输出拆分为 $g$ 个组，对每个组的输出 $o^G_{t,i}\in\mathbb{R}^{\frac{cn_h}{g}}$，先将其投影到 $d_g$ 维的中间输出 $o^{G'}_{t,i}\in\mathbb{R}^{d_g}$，其中 $d_g<\frac{cn_h}{g}$。最后，再将组合后的中间输出 $[o^{G'}_{t,1};\ldots;o^{G'}_{t,g}]\in\mathbb{R}^{d_gg}$ 投影到最终的注意力输出 $\hat{o}_t\in\mathbb{R}^d$。
+
+###### 重度压缩注意力（Heavily Compressed Attention）
+
+![[Pasted image 20260810165952.png|600]]
+
+
+HCA 的核心在于*实施更激进的压缩率，但保持全局稠密注意力*，即不进行稀疏选择：
+
+> [!NOTE] 🦄 压缩键-值条目
+> HCA 的压缩机制大体与 CSA 相似，但采用大得多的压缩率 $m'\;(m'\gg m)$，并且不进行重叠压缩。给定输入序列 $H\in\mathbb{R}^{n\times d}$，首先计算原始 KV 条目 $C$ 和压缩权重 $Z$：
+>
+> $$
+> C=H\cdot W^{KV},\qquad Z=H\cdot W^Z
+> $$
+>
+> 随后，每 $m'$ 个条目在权重和位置偏置 $B\in\mathbb{R}^{m'\times c}$ 的引导下被压缩为一个条目，产出 $C^{\mathrm{Comp}}\in\mathbb{R}^{\frac{n}{m'}\times c}$：
+>
+> $$
+> S_{m'i:m'(i+1)-1}=\operatorname{Softmax}_{\mathrm{row}}\left(Z_{m'i:m'(i+1)-1}+B\right)
+> $$
+>
+> $$
+> C_i^{\mathrm{Comp}}=\sum_{j=m'i}^{m'(i+1)-1}S_j\odot C_j
+> $$
+>
+> 这一操作将序列长度缩减到了原先的 $\frac{1}{m'}$ 倍。
+
+> [!NOTE] 🏆 MQA 与分组输出投影
+> HCA 采用与 CSA 完全一致的低秩隐向量 Query 生成方式、共享键值 MQA 机制以及分组输出投影策略，此处不再赘述。
+
+> [!TIP] 其他关键技术细节 
+> - **Query 与 KV 条目归一化**：在核心注意力计算之前，CSA 和 HCA 均会对每一个 Query 头以及压缩后唯一的 KV 头执行额外的 RMSNorm 操作。这可以有效避免注意力 Logits 发生数值爆炸，提升训练稳定性。
+> - **Partial RoPE**：RoPE 仅应用于 Query、KV 条目及核心注意力输出的最后 64 个维度。由于 KV 压缩条目同时承载了 Key 和 Value 的职能，核心注意力输出 $\{o_{t,i}\}$ 会携带来自 Value 权重大高低带来的绝对位置嵌入。因此对核心输出 $o_{t,i}$ 的最后 64 维应用了带有位置 $-i$ 的反向 RoPE。
+> - **Sliding Window Attention**：为了严格保持因果律，Query 只能看到前方的压缩块，因而无法访问自身压缩块内部的同伴 token。考虑到临近 token 往往具有更高的局部相关性，CSA 和 HCA 均引入一条补充的局部滑动窗口注意力分支：为每个 Query 动态生成临近 $n_{\mathrm{win}}$ 个 token 的未压缩原生 KV 条目，并将其与压缩条目拼接后一起送入核心注意力计算。
+> - **Attention Sink**：为了允许注意力头灵活调整其总注意力得分，例如在不重要时令总得分接近 $0$，模型引入 Attention Sink 技术。通过设置一系列可学习的 Sink Logits $\{z'_{h,1},z'_{h,2},\ldots,z'_{h,n_h}\}$，将其指数项作为偏置项直接累加到 Softmax 的分母中：
+>
+> $$
+> s_{h,i,j}
+> =
+> \frac{\operatorname{Exp}(z_{h,i,j})}
+> {\sum_k\operatorname{Exp}(z_{h,i,k})+\operatorname{Exp}(z'_h)}
+> $$
+
+
+
+##### 4. Muon 优化器
+
+![[Pasted image 20260810165928.png|600]]
+
+DeepSeek-V4 系列的大部分模块放弃了传统的 AdamW，改用 Muon 优化器，这主要得益于*它能够带来更快的收敛速度以及更高的训练稳定性*。算法完整步骤如下。
+
+> [!NOTE] 算法解析
+> **输入**：学习率 $\eta$、动量因子 $\mu$、权重衰减系数 $\lambda$、更新重缩放因子 $\gamma$。
+>
+> 1. 对每一个训练步骤 $t$ 执行循环。
+> 2. 对每一个逻辑上独立的权重矩阵 $W\in\mathbb{R}^{n\times m}$ 执行循环。
+> 3. 计算当前步的梯度：
+>
+> $$
+> G_t=\nabla_W\mathcal{L}_t(W_{t-1})
+> $$
+>
+> 4. 累积动量缓冲区：
+>
+> $$
+> M_t=\mu M_{t-1}+G_t
+> $$
+>
+> 5. 应用 Nesterov 技巧与混合牛顿-舒尔茨迭代：
+>
+> $$
+> O'_t=\operatorname{HybridNewtonSchulz}(\mu M_t+G_t)
+> $$
+>
+> 6. 重缩放更新量的均方根：
+>
+> $$
+> O_t=O'_t\cdot\sqrt{\max(n,m)}\cdot\gamma
+> $$
+>
+> 7. 执行权重衰减并更新参数：
+>
+> $$
+> W_t=W_{t-1}\cdot(1-\eta\lambda)-\eta O_t
+> $$
+>
+> 8. 结束内层循环。
+> 9. 结束外层循环。
+
+###### 基础配置
+
+在如下模块中依然使用 AdamW 优化器，包括：
+- Embedding 模块；
+- 预测头模块；
+- mHC 模块内部的静态偏置（Static biases）与门控因子（Gating factors）；
+- 所有 RMSNorm 模块的权重。
+
+除了上述模块之外，*所有其他模块均使用 Muon 优化器进行参数更新*。
+
+DeepSeek-V4 对 Muon 优化器的参数应用了权重衰减（Weight decay），使用了 Nesterov 动量技巧，并且重新缩放了更新矩阵的均方根（RMS）。这种均方根重缩放的设计，其核心目的是为了能够直接复用现有的 AdamW 超参数，即无缝嵌入现有的学习率体系中。此外还采用混合牛顿-舒尔茨迭代来执行矩阵的正交化过程。
+
+###### 混合牛顿-舒尔茨迭代
+
+对于一个给定的矩阵 $M$，假设其奇异值分解（SVD）表示为：
+
+$$
+M=U\Sigma V^T
+$$
+
+牛顿-舒尔茨迭代的基本原理和目标，就是通过数值逼近的方式，将矩阵 $M$ 近似正交化为 $UV^T$。通常情况下，矩阵 $M$ 首先需要进行归一化操作：
+
+$$
+M_0=\frac{M}{\lVert M\rVert_F}
+$$
+
+以此确保其最大奇异值不会超过 $1$。在此基础上，每一步牛顿-舒尔茨迭代都会执行以下数学运算：
+
+$$
+M_k=aM_{k-1}+b(M_{k-1}M_{k-1}^T)M_{k-1}+c(M_{k-1}M_{k-1}^T)^2M_{k-1}
+$$
+
+混合牛顿-舒尔茨方法在两个截然不同的阶段中，总共执行 **10** 步迭代：
+
+- **前 8 个步骤**：系数配置为 $(a,b,c)=(3.4445,-4.7750,2.0315)$。这一阶段的目的是驱动快速收敛，以最短的迭代次数将矩阵的奇异值迅速拉近到 $1$ 附近。
+- **后 2 个步骤**：系数配置为 $(a,b,c)=(2,-1.5,0.5)$。这一阶段切换系数是为了将奇异值精确且稳定地锁定在 $1$。
+
+###### 避免注意力 Logits 爆炸
+
+由于 DeepSeek-V4 系列设计的独特注意力架构，可以在注意力 Query 和 KV 条目上直接应用 RMSNorm 运算，这在机制上已经非常有效地防止了注意力 Logits 发生数值爆炸。因此在优化器中，*不需要、也没有采用 QK 裁剪技术*。
+
+##### 5. 预训练
+
+###### 1. 数据构建
+
+在 DeepSeek-V3 预训练数据的基础上，构建了一个更多样性、更高质量且拥有更长有效上下文的训练语料库，并持续不断优化数据构建流程。
+
+> [!TIP] 🎉
+> - **网页数据清洗**：对于源自互联网的网页数据，实施严格的过滤策略，用以剔除批量的自动生成内容以及模板化内容，从而有效缓解模型崩溃的潜在风险。
+> - **核心内容强化**：数学和编程语料库依然是训练数据的核心组成部分。在训练的中期阶段，通过整合融入智能体数据，进一步增强了 DeepSeek-V4 系列的编码与多步骤任务执行能力。
+> - **多语言语料库**：对于多语言数据，构建了一个规模更大的语料库，显著改善了模型对不同文化背景下长尾知识的捕捉与吸收能力。
+> - **长文本处理**：在 V4 中，优先筛选了学术论文、技术报告以及其他能够体现独特学术价值的深度材料。
+
+综上，预训练语料库最终包含了超过 **32T** 个 token，涵盖数学内容、代码、网页、长文档以及其他高质量的重点大类。在预训练数据的预处理策略上，很多都沿用了 DeepSeek-V3 的成熟方案。在分词方面，在 DeepSeek-V3 分词器的基础之上，引入了少量专门用于上下文构建的特殊 token，并依然将词表大小维持在 **128K** 。此外，也继承了源自 V3 的 *Token-splitting* 和 *FIM（Fill-in-Middle）* 策略，然后将来自不同数据源的文档打包到合适的序列当中，以最大限度地减少样本截断带来的弊端。与 DeepSeek-V3 不同的是，V4 在整个预训练阶段全面采用了样本级注意力掩码。
+
+###### 2. 预训练设置
+
+###### 模型设置
+
+> [!NOTE] 🥖 DeepSeek-V4-Flash
+> Transformer 层数设置为 **43** 层，隐藏层维度 $d$ 设置为 **4096** 。对于网络最开始的前两层，使用*纯滑动窗口注意力*。对于后续所有层，以交错方式混合使用 CSA 和 HCA。
+>
+> - **CSA 配置**：压缩率 $m$ 设置为 **4**；indexer query 头数 $n_h^I$ 设置为 **64**；indexer 头维度 $c^I$ 设置为 **128**；用于稀疏注意力的所选 KV 条目数，即 Attention Top-$k$，设置为 **512** 。
+> - **HCA 配置**：压缩率 $m'$ 设置为 **128** 。
+> - **共同配置**：对于 CSA 和 HCA，查询头数 $n_h$ 均设置为 **64**，头维度 $c$ 为 **512**，Query 压缩维度 $d_c$ 设为 **1024** 。输出投影组数 $g$ 设置为 **8**，每个中间注意力输出的维度 $d_g$ 设置为 **1024** 。作为补充机制的滑动窗口注意力分支，其窗口大小 $n_{\mathrm{win}}$ 设置为 **128** 。
+> - **MoE 与残差架构**：所有 Transformer 块中都配置了 MoE 层，但在前 **3** 个 MoE 层中采用了 Hash 路由策略。每个 MoE 层由 **1** 个共享专家（Shared Expert）和 **256** 个路由专家（Routed Experts）组成，其中每个专家的中间隐藏层维度为 **2048** 。在所有路由专家中，每个 token 均会激活其中的 **6** 个专家。MTP 深度设置为 **1** 。mHC 宽度扩展因子 $n_{hc}$ 设置为 **4**，Sinkhorn-Knopp 算法的迭代次数 $t_{\max}$ 固定为 **20** 。
+> - **参数总量**：DeepSeek-V4-Flash 包含 **284B** 总参数，其中每个 token 实际激活的参数量为 **13B** 。
+
+> [!NOTE] ⚽ DeepSeek-V4-Pro
+> Transformer 层数为 **61** 层，隐藏层维度 $d$ 设置为 **7168** 。Pro 版在最开始的前两层使用了 HCA；对于后续的所有层，同样以交错的方式混合使用 CSA 和 HCA。
+>
+> - **CSA 配置**：压缩率 $m$ 同样为 **4**；indexer query 头数 $n_h^I$ 设为 **64**；indexer 头维度 $c^I$ 设为 **128**，但 Attention Top-$k$ 扩大到 **1024** 。
+> - **HCA 配置**：压缩率 $m'$ 依然保持在 **128** 。
+> - **共同配置**：在 CSA 和 HCA 中，Query 头数 $n_h$ 升级为 **128**，头维度 $c$ 为 **512**，Query 压缩维度 $d_c$ 扩展为 **1536** 。输出投影组数 $g$ 设置为 **16**，每个中间注意力输出的维度 $d_g$ 设置为 **1024**；滑动窗口注意力大小 $n_{\mathrm{win}}$ 维持在 **128** 。
+> - **MoE 与残差架构**：同样在所有块中使用 MoE，且前 **3** 个 MoE 层也采用 Hash 路由。每个 MoE 层由 **1** 个共享专家和 **384** 个路由专家组成，每个专家的中间隐藏层维度扩大至 **3072** 。每个 token 激活其中的 **6** 个专家。MTP 深度设为 **1** 。mHC 模块的扩展因子 $n_{hc}$ 依旧为 **4**，Sinkhorn-Knopp 迭代次数 $t_{\max}$ 依旧为 **20** 。
+> - **参数总量**：在此配置下，DeepSeek-V4-Pro 的总参数量达到 **1.6T**，其中每个 token 激活的参数量为 **49B** 。
+
+###### 训练设置
+
+> [!NOTE] ⛱️ DeepSeek-V4-Flash
+> 针对网络中的绝大部分参数采用 Muon 优化器，但 Embedding 层、预测头以及所有 RMSNorm 模块的权重保留 AdamW 优化器。
+>
+> - **优化器超参数**：对于 AdamW，超参数配置为 $\beta_1=0.9$、$\beta_2=0.95$、$\epsilon=10^{-20}$，且 $\mathrm{weight\_decay}=0.1$。对于 Muon，动量设置为 **0.95**，权重衰减系数为 **0.1**，同时将每个更新矩阵的 RMS 重新缩放至 **0.18**，以便完美复用 AdamW 的学习率。
+> - **训练排期**：在 **32T** 个 token 上完整训练了 DeepSeek-V4-Flash。与 V3 类似，采用*动态批大小排期策略*：将批大小从初期的较小规模逐步攀升至最高的 **75.5M token**，并在接下来的绝大部分训练流程中将其锁定在 **75.5M** 。
+> - **学习率体系**：学习率在前 **2000** 步中执行线性预热，并在随后的绝大部分训练进程中保持在峰值 $2.7\times10^{-4}$。在临近训练结束时，使用余弦函数排期，最终将学习率衰减至 $2.7\times10^{-5}$。
+> - **上下文长度外推**：训练最初从 **4K** 序列长度启动，随后逐步且分阶段地将训练序列长度阶梯式扩展至 **16K** 、**64K**，直至最终的 **1M** 。
+> - **稀疏注意力引入策略**：在引入稀疏注意力时，为保障模型底层表达的稳健，首先在前 **1T** 个 token 的训练中采用完全稠密的注意力进行模型热身。随后，在序列长度扩展到 **64K** 时，正式引入稀疏注意力，并在剩余的全部训练中维持这一稀疏特性。当首次引入注意力稀疏化时，先设定一个短暂的训练阶段来给 CSA 内部的 Lightning Indexer 进行专门热身；在此之后，再以稀疏注意力姿态跑完剩下的绝大部分预训练。
+> - **均衡控制**：对于无辅助损失的负载均衡，Bias 的更新速度设置为 **0.001** 。对于序列级均衡损失，其损失权重设为 **0.0001**，以确保单个序列内部绝不发生极端失衡。在绝大部分训练中，MTP 的损失权重设为 **0.3**，而一旦开始步入学习率衰减阶段，该权重则下调至 **0.1** 。
+
+> [!NOTE] 🖍️ DeepSeek-V4-Pro
+> 除了部分特定的超参数数值外，DeepSeek-V4-Pro 的训练设置与 Flash 几乎一致，其 AdamW 和 Muon 的底层基础超参数与 Flash 版完全相同。
+>
+> - **特异性指标**：V4 在 **33T** 个 token 上训练了 Pro 版。同样应用了批大小排期策略，其最大批大小达到了 **94.4M token** 。在学习率排期上与 Flash 类似，但峰值学习率设置为 $2.0\times10^{-4}$，末端最低学习率则衰减至 $2.0\times10^{-5}$。
+> - DeepSeek-V4-Pro 在前期保持了更长时间的稠密注意力训练阶段，但随后引入稀疏注意力的两阶段过渡方法与 Flash 完全一致。其负载均衡偏置更新速度 **0.001** 、序列均衡损失权重 **0.0001** 以及 MTP 损失权重 **0.3** 均与 Flash 完全等同。
+
+###### 训练不稳定性
+
+训练万亿级参数的 MoE 模型会频繁遭遇显著的稳定性考验。DeepSeek-V4 在实际训练过程中，遇到了训练数值不稳定问题。虽然在发生 Loss 暴涨时，通过*简单的回滚操作可以暂时恢复模型的训练状态*，但经验证明，这绝对不是长久之计，因为回滚操作并不能从根本上阻止 Loss 尖峰在未来如幽灵般再次反复出现。通过大量经验性观察发现：*Loss 尖峰的发生，在时间线上总是与 MoE 层中出现的异常离群值高度绑定；并且 MoE 自身的动态路由机制本身，似乎还在扮演着进一步加剧和恶化这些离群值扩散的催化剂角色*。因此作者从两个完全不同的技术维度来联合解决这一问题：
+
+
+1. 设法斩断由动态路由诱发的恶性循环。
+2. 直接对数值层面的异常离群值实施强力压制。
+
+作者发现了两项高效的实用工程技术，保证了整个模型训练过程的结构稳定：
+
+> [!NOTE] 🎹 预见性路由
+> *如果将骨干网络与路由网络的同步更新进行物理层面的解耦，将能够大幅提升训练稳定性。*
+>
+> - 在训练的第 $t$ 步时，依然使用当前最新的网络参数 $\theta_t$ 来正常进行前向的特征计算；但是决定 token 去往哪里的路由索引，则是根据并应用历史网络参数 $\theta_{t-\Delta t}$ 来计算的。
+> - 在工程落地时，为彻底规避在同一步里不得不重复加载两次模型参数所带来的额外 I/O 与计算开销，在第 $t-\Delta t$ 步时，就会提前获取并预加载第 $t$ 步所需的数据。
+>
+> > 注：
+> > 作者在后台“预见性”地提前计算出这批数据未来所需的路由索引并将其塞入缓存，这就是为什么叫“预见性路由”。
+>
+> 作者也在底层基础设施层面对此进行了极限重构和优化：
+>
+> 1. 鉴于预先计算路由索引只需要在数据上跑一次纯粹的前向传播，因此作者精细地编排了流水线的执行逻辑，让这部分开销与专家并行的通信过程实现了高密度重叠，成功将预见性路由带来的额外训练耗时硬性遏制在 **20%** 左右。
+> 2. 引入一套自动触发检测机制：正常训练时关闭该功能，只有当系统检测到 Loss 尖峰发生时，才会触发一个极短的时间回滚，并仅在回滚后的特定周期内限时激活预见性路由模式；在安全运行了一段设定的平稳期后，系统会自动平滑切回标准的常规训练模式。
+> 3. 这种动态按需触发的精妙工程应用，能够以几乎可以忽略不计的整体额外训练开销，完美御敌 Loss 尖峰于国门之外，且没有对模型的最终收敛性能造成任何负面剥蚀。
+
+
+![[Pasted image 20260810170934.png]]
+
+
+
+![[Pasted image 20260810171011.png]]
+
+
+
+
+![[Pasted image 20260810171019.png]]
+
+
+> [!NOTE] 🎹 SwiGLU 裁剪
+> 之前数值裁剪经常用于约束数值的波动边界，进而保障训练的平稳。在具体实践中发现：*直接对 MoE 内部 SwiGLU 的核心计算路径施加裁剪操作，可以近乎完美地在萌芽阶段直接掐灭离群值的出现，并在不牺牲任何模型性能的前提下，为整个超大规模训练流程提供极其强悍的数值托底稳定作用。*
+>
+> 在整个 DeepSeek-V4-Flash 和 DeepSeek-V4-Pro 的训练全周期中，作者将 SwiGLU 的线性模块严格限制在 $[-10,10]$ 的硬性区间内，同时将门控模块的输出上界限制在 **10** 以内。
+
+##### 6. 后训练
+
+###### 1. 后训练流程
+
+后训练流程很多沿用了 DeepSeek-V3.2 的做法，但做出了一个方法论替代：传统的混合强化学习（Mixed RL）阶段被完全替换为了在线策略蒸馏 OPD（On-Policy Distillation）。
+
+**专家训练**
+
+通过改造 DeepSeek-V3.2 的训练流程，开发各个领域的专家模型。每个模型按顺序依次经历：
+
+1. 初始的监督微调（SFT）阶段；
+2. 随后在特定领域 Prompt 和奖励信号引导下的强化学习（RL）阶段；
+3. 强化学习阶段使用 GRPO 算法，核心超参数与之前版本一致。
+
+**推理程度分级**
+
+模型在推理任务上的性能表现，从根本上受到其所消耗的推理算力程度的支配。因此在截然不同的 RL 配置下训练了互不相同的专家模型，以促进开发出能够完美适应不同推理容量的模型。DeepSeek-V4-Pro 和 DeepSeek-V4-Flash 均原生支持三种特定的推理模式；对于每一种模式，在 RL 训练期间施加了完全不同的长度惩罚以及上下文窗口，这使得模型最终在推理时会输出长短不一的 token 长度。
+
+| 推理模式 | 核心特征 | 典型应用场景 | 回复格式 |
+| --- | --- | --- | --- |
+| Non-think | 快速、直觉式的回复，基于习惯或简单规则。 | 日常例行任务、紧急反应、低风险决策。 | `</think>` 最终摘要内容 |
+| Think High | 有意识的逻辑分析，速度较慢但更准确。 | 复杂问题解决、规划、中等风险决策。 | `<think>` 思考过程 token `</think>` 最终摘要内容 |
+| Think Max | 将推理能力推向模型的绝对极限。慢但极其强大。 | 探索模型推理能力的边界。 | 1. 开头注入特殊系统提示。2. `<think>` 思考过程 token `</think>` 最终摘要内容 |
+
+此外，对于 Think Max 模式，会在 System Prompt 的最开始强行置入一段特定指令，以引导模型的深度推理过程，具体内容如下：
+
+```text
+Reasoning Effort: Absolute maximum with no shortcuts permitted.
+You MUST be very thorough in your thinking and comprehensively decompose the
+problem to resolve the root cause, rigorously stress-testing your logic against all potential
+paths, edge cases, and adversarial scenarios.
+Explicitly write out your entire deliberation process, documenting every intermediate
+step, considered alternative, and rejected hypothesis to ensure absolutely no assumption
+is left unchecked.
+```
+
+**奖励模型**
+
+通常情况下，易于验证的任务可以使用简单的基于规则的验证器或测试用例进行有效优化。相比之下，难以验证的任务传统上依赖于基于人类反馈的强化学习，这需要大量的人类标注来训练一个标量奖励模型。
+
+然而，在 DeepSeek-V4 系列的后训练阶段，作者放弃了这些传统的基于标量的奖励模型。为了解决难以验证的任务，构建了规则引导的 RL 数据，并使用生成式奖励模型 GRM（Generative Reward Model）来评估策略轨迹，并且直接对 GRM 本身应用了 RL 优化。
+
+- 在这种范式中，actor 在原生功能上充当了 GRM，从而实现模型评估能力与其标准生成能力的联合优化。
+- 通过统一这些角色，模型的内部推理能力本质上融入了其评估过程，从而实现了高度鲁棒的评分。
+- 此外，由于模型利用自身的逻辑来跨复杂任务进行泛化，这种方法仅需一套精简且多样化的人类标注即可实现卓越性能。
+
+**工具调用**
+
+与之前版本一致，利用专用的 `<think></think>` 标签来描绘推理路径。在 DeepSeek-V4 系列中，引入了一种新的工具调用图谱，采用特殊的 `|DSML|` 标记，并为工具调用采用一种基于 XML 的格式。
+
+> [!NOTE] 注
+> XML 格式有效地减少了转义失败并降低了工具调用错误，为模型与工具的交互提供了一个更鲁棒的接口。
+
+**交替思考**
+
+DeepSeek-V3.2 引入一种上下文管理策略，可以在“工具调用–结果返回”的轮次中保留推理痕迹，但在新用户消息到达时将其丢弃。虽然有效，但这在复杂的智能体工作流中仍造成不必要的标记浪费：*每一个新的用户轮次都会清空所有累积的推理内容，迫使模型从头开始重建其问题解决状态。*
+
+利用 DeepSeek-V4 系列扩展的 **1M token** 上下文窗口，作者进一步改进了这一机制，以最大化交替思考在智能体环境中的有效性：
+
+> [!NOTE] ⛱️ 工具调用场景
+> 所有推理内容在整个对话过程中被完全保留。与 DeepSeek-V3.2 在每个新用户轮次丢弃思考痕迹不同，DeepSeek-V4 系列在所有轮次中保留完整的推理历史，包括跨越用户消息边界。这允许模型在长程智能体任务上维持一个连贯的、累积的思维链。
+
+> [!NOTE] 🎼 一般对话场景
+> 原有策略得以保留：当新的用户消息到达时，前一轮的推理内容将被丢弃，从而在持久性推理痕迹带来有限收益的设置中保持上下文的简练。
+
+与 DeepSeek-V3.2 一样，通过用户消息来模拟工具交互的智能体框架可能不会触发工具调用上下文路径，因此可能无法从增强的推理持久性中受益。继续推荐对此种类架构使用非思考模型。
+
+**快速指令**
+
+在聊天机器人场景中，在生成回答之前必须执行许多辅助任务，例如确定是否触发网络搜索、意图识别等。传统上，这些任务由一个单独的小模型处理；由于它无法复用已有的 KV 缓存，因此需要重复的预填充。
+
+为克服这一限制，DeepSeek 引入了快速指令：直接在输入序列后追加一组专用的特殊标记，其中每个标记对应一个特定的辅助任务。通过直接复用已经计算好的 KV 缓存，该机制完全避免了重复的预填充，并允许某些任务得以并行执行，如生成搜索查询语句、确定权威性和领域。因此，这种方法*显著缩短了用户感知到的首字输出时间，并消除了维护和迭代额外小模型的工程开销*。
+
+###### On-Policy Distillation
+
+在通过专门的微调和强化学习训练了多个领域特定的专家之后，采用 OPD（On-Policy Distillation）作为将专家能力合并到最终模型中的主要技术。OPD 已经作为一种高效的后训练范式涌现出来，用于将领域专家的知识和能力高效地转移到单个统一模型中。这是通过让学生在自身生成的轨迹上学习导师模型的输出分布来实现的。形式上，给定一组含有 $N$ 个专家模型的集合 $\{\pi_{E_1},\pi_{E_2},\ldots,\pi_{E_N}\}$，OPD 的目标函数定义为：
+
+$$
+L_{\mathrm{OPD}}(\theta)
+=
+\sum_{i=1}^{N}w_i\cdot D_{\mathrm{KL}}\left(\pi_\theta\parallel\pi_{E_i}\right)
+$$
+
+在这种阐述中，$w_i$ 代表分配给每个专家的权重，通常由该专家的相对重要性决定。计算反向 KL 散度 $D_{\mathrm{KL}}(\pi_\theta\parallel\pi_{E_i})$ 需要从学生策略 $\pi_\theta$ 中采样训练轨迹，以维持 on-policy 学习。
+
+其底层逻辑确保统一的策略 $\pi_\theta$ 能够选择性地向与当前任务上下文相关的专门专家学习，例如在数学 reasoning 任务上与数学专家对齐，在编程任务上与编码专家对齐。通过这一机制，来自物理上独立的专家权重知识通过 logits 级别的对齐被巩固到统一的参数空间中，实际规避了在传统的权重合并或混合 RL 技术中经常遇到的性能退化。在这一阶段，使用了涵盖各个领域的十多个导师模型来蒸馏单个学生模型。
+
+在处理上述 OPD 目标时，先前的作品通常将全词表的 KL 损失简化为每个标记位置上的 token 级 KL 估计，并通过 on-policy 损失计算中将
+
+$$
+\operatorname{sg}\left[
+\log\frac{\pi_{E_i}(y_t\mid x,y_{<t})}
+{\pi_\theta(y_t\mid x,y_{<t})}
+\right]
+$$
+
+（其中 $\operatorname{sg}$ 代表停止梯度操作）替换为 per-token advantage 估计来复用 RL 框架。*虽然这种方法资源利用效率高，但它会导致梯度估计中的高方差，并经常引起训练不稳定。*因此在 OPD 中采用了全词表对数几率蒸馏。在计算反向 KL 损失时保留完整的 logit 分布可以产生更稳定的梯度估计，并确保对导师知识的忠实蒸馏。
+
+###### 2. 后训练基建
+
+为支持超长上下文的强化学习以及涉及十多个导师模型的知识蒸馏 OPD，DeepSeek-V4 对底层基础设施进行了五大核心优化，从而大幅缩短模型的迭代周期。
+
+###### FP4 量化感知训练（QAT）
+
+为了降低显存占用并提高推理速度，模型在后训练中引入了低精度量化训练：
+
+> [!TIP] 🛩️
+> - **量化对象**：主要针对显存占用大户 MoE 专家权重以及 CSA 注意力机制中的 QK 路径。
+> - **无损转换**：
+>   - 在训练的前向传播中，FP4 权重会被无损地反量化回 FP8 进行计算；
+>   - 在采样滚动阶段，则直接使用原生的 FP4 权重，大幅降低显存消耗。
+>   - **其他加速**：将索引分数从 FP32 压缩到 BF16，使 Top-$k$ 选择器获得 **2×** 加速，且几乎没有精度损失。
+
+###### 用于全词表 OPD 的高效导师调度
+
+全词表蒸馏需要学生模型去拟合多个参数量极大的导师模型的输出概率分布，这会带来恐怖的显存和 I/O 压力：
+
+> [!TIP] 🎨
+> - **动态加载**：导师模型的权重平时存放在中央存储中，只有在前向传播需要时才动态分片加载到 GPU 中，用完即释放。
+> - **隐藏状态缓存**：不在磁盘中存储庞大的完整 Logits，而是只缓存最后一层的导师隐藏状态，在训练时利用预测头动态重建，几乎不占内存。
+> - **样本对齐**：派发训练数据时按照导师索引进行排序，确保 GPU 显存中在同一时间最多只驻留一个导师模型的预测头。
+
+###### 可抢占与容错的采样服务
+
+大规模集群中硬件故障频繁，且计算资源经常需要被高优先级任务抢占：
+
+> [!TIP] 👍
+> - **Token 级预写日志（WAL）**：模型生成文本时，每产出一个 Token 就会立刻写入 WAL 日志。
+> - **安全恢复**：当任务被抢占或发生硬件故障重启时，系统会结合 WAL 日志和之前保存的 KV 缓存继续解码。这不仅省去了从头重新生成的计算浪费，更重要的是避免了重新生成带来的长度偏差。
+
+###### RL 框架扩展
+
+为了让强化学习和蒸馏算法能跑在 **100 万 token** 的超长序列上，框架对数据传输进行了极简化改造：
+
+> [!TIP] 📚
+> - 将滚动数据拆分为轻量级的元数据和重量级的 per-token 字段。
+> - 全局打乱和打包计算只用轻量元数据跑；笨重的 token 数据则通过共享内存按需加载，在 mini-batch 消耗完后立即释放，从而*彻底解放了 CPU 和 GPU 的内存压力*。
+
+###### 智能体 AI 沙箱基础设施（DSec）
+
+针对智能体在后训练和评估时需要频繁执行代码、调用工具的需求，DeepSeek 搭建了名为 **DSec** 的生产级弹性计算沙箱平台：
+
+> [!TIP] 🌟
+> - **一套接口，四种环境**：上层提供统一的 Python SDK，底层可根据安全和性能需求，秒级切换纯函数调用、Docker 容器、轻量级微型虚拟机 `microVM` 或完整虚拟机 `fullVM`。
+> - **秒级镜像加载**：通过分层存储技术，将基础镜像存放在 3FS 分布式文件系统上共享，数据块按需获取，实现沙箱的毫秒级启动与恢复。
+> - **高密度部署**：优化虚拟化环境中的页面缓存和运行时自旋锁竞争，使单个集群可以平稳承载数十万个并发沙箱实例。
+> - **断点快速重放**：沙箱全程记录智能体的操作轨迹。如果 AI 训练任务中途被抢占，重启后 DSec 会直接对已完成的命令“快进”重放缓存结果，既加速任务恢复，又避免重复执行非幂等操作（如重复扣款、重复写文件）导致的错误。

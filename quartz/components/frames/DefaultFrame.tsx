@@ -68,6 +68,32 @@ export const DefaultFrame: PageFrame = {
           <Content {...componentData} />
           <hr />
           <div class="page-footer">
+            {afterBody.length > 0 &&
+              componentData.fileData.frontmatter?.comments !== false &&
+              componentData.fileData.frontmatter?.comments !== "false" && (
+                <div class="comments-notice">
+                  <h2>讨论</h2>
+                  <p>
+                    评论区由 GitHub Discussions 提供支持。发表评论需要使用 GitHub 账号登录，您发布的内容将公开显示在{" "}
+                    <a
+                      href="https://github.com/yifu-ding/notes"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      本仓库
+                    </a>{" "}
+                    的 Discussions 页面中。如需删除已发表的评论，请前往{" "}
+                    <a
+                      href="https://github.com/yifu-ding/notes/discussions"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Discussions 页面
+                    </a>{" "}
+                    找到对应评论并自行删除。
+                  </p>
+                </div>
+              )}
             {afterBody.map((BodyComponent) => (
               <BodyComponent {...componentData} />
             ))}
